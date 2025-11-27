@@ -1,52 +1,47 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Harmony Project</title>
-  <style>
-    body {
-      font-family: Arial;
-      background: #111;
-      color: white;
-      text-align: center;
-    }
-    video {
-      width: 300px;
-      margin: 10px;
-      border: 3px solid white;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Video Trigger</title>
+
+<style>
+  body {
+    background: black;
+    margin: 0;
+    overflow: hidden;
+  }
+  #vid {
+    display: none;      /* hidden at start */
+    width: 100vw;       /* full screen */
+    height: 100vh;
+    object-fit: contain;
+  }
+</style>
+
 </head>
 <body>
 
-  <h1>Harmony Video Test</h1>
-  <p>Press keys 1, 2, or 3 to play videos.</p>
+<!-- CHANGE "video.mp4" to your actual file -->
+<video id="vid" src="video.mp4"></video>
 
-  <!-- YOUR VIDEOS (change filenames!) -->
-  <video id="v1" src="IMG_6797.mp4"></video>
-  <video id="v2" src="note2.mp4"></video>
-  <video id="v3" src="note3.mp4"></video>
+<script>
+  const v = document.getElementById("vid");
 
-  <script>
-    // Get the video elements
-    const v1 = document.getElementById("v1");
-    const v2 = document.getElementById("v2");
-    const v3 = document.getElementById("v3");
-
-    // Function to play/reset a video
-    function playVideo(video) {
-      video.currentTime = 0;   // reset to start
-      video.play();            // play with sound
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "s" || e.key === "S") {
+      v.currentTime = 0;       // restart video
+      v.style.display = "block";
+      v.play();
     }
+  });
 
-    // Key controls
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "1") playVideo(v1);
-      if (event.key === "2") playVideo(v2);
-      if (event.key === "3") playVideo(v3);
-    });
-
-  </script>
+  document.addEventListener("keyup", function(e) {
+    if (e.key === "s" || e.key === "S") {
+      v.pause();               // stop video
+      v.style.display = "none";
+    }
+  });
+</script>
 
 </body>
 </html>
