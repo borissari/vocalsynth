@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Video Trigger</title>
+<title>Video Trigger V.1.2</title>
 
 <style>
   body {
@@ -21,24 +21,30 @@
 </head>
 <body>
 
-<!-- CHANGE "video.mp4" to your actual file -->
-<video id="vid" src="IMG_6797.mov"></video>
+<!-- CHANGE "video.mp4" to your actual file name -->
+<video id="vid" src="video.mp4"></video>
 
 <script>
   const v = document.getElementById("vid");
+  let isPlaying = false;  // track if video is already playing because of S
 
   document.addEventListener("keydown", function(e) {
-    if (e.key === "s" || e.key === "S") {
-      v.currentTime = 0;       // restart video
-      v.style.display = "block";
-      v.play();
+    if ((e.key === "s" || e.key === "S") && !e.repeat) {
+      // only on first press, ignore key repeat
+      if (!isPlaying) {
+        v.currentTime = 0;       // restart video
+        v.style.display = "block";
+        v.play();
+        isPlaying = true;
+      }
     }
   });
 
   document.addEventListener("keyup", function(e) {
     if (e.key === "s" || e.key === "S") {
-      v.pause();               // stop video
+      v.pause();                 // stop video
       v.style.display = "none";
+      isPlaying = false;
     }
   });
 </script>
