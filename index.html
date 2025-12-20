@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Audiosynth V.2.3</title>
+<title>Audiosynth V.2.4</title>
 
 <style>
   body {
@@ -14,16 +14,33 @@
   .vid {
     display: none;
     position: absolute;
-    height: 50vh;
     width: 50vw;
+    height: 50vh;
     object-fit: cover;
+    transition: all 0.2s ease;
   }
 
-  #v_z { top: 30px; left: 5vw; }
-  #v_c { top: 20px; left: 20vw; }
-  #v_b { top: 10px; left: 35vw; }
-  #v_m { top: 40px; left: 50vw; }
-  #v_dot { top: 25px; left: 65vw; }
+  /* original positions (used in multi mode) */
+  #v_z { top: 30px; left: 5vw;  object-position: 0% 0%; }
+  #v_c { top: 20px; left: 20vw; object-position: 50% 0%; }
+  #v_b { top: 10px; left: 35vw; object-position: 100% 0%; }
+  #v_m { top: 40px; left: 50vw; object-position: 0% 100%; }
+  #v_dot { top: 25px; left: 65vw; object-position: 50% 100%; }
+
+  /* FULL FRAME when solo */
+  .full {
+    width: 80vw !important;
+    height: 80vh !important;
+    top: 10vh !important;
+    left: 10vw !important;
+    object-position: 50% 50% !important;
+    z-index: 1;
+  }
+
+  /* CROPPED MODE when multiple keys */
+  .multi {
+    z-index: 2;
+  }
 </style>
 </head>
 
@@ -36,13 +53,12 @@ CLICK once → then hold Z C B M .
 <video id="v_z" class="vid" src="IMG_6797.mov" loop playsinline></video>
 <video id="v_c" class="vid" src="IMG_8721.mov" loop playsinline></video>
 <video id="v_b" class="vid" src="filtered-EF866004-E8A0-4EA5-AFE8-DC5900FE4DEF 2.mov" loop playsinline></video>
-
-<!-- reuse if needed -->
 <video id="v_m" class="vid" src="IMG_6797.mov" loop playsinline></video>
 <video id="v_dot" class="vid" src="IMG_8721.mov" loop playsinline></video>
 
 <script>
 let unlocked = false;
+const activeKeys = new Set();
 
 const videos = {
   "z": document.getElementById("v_z"),
@@ -58,36 +74,57 @@ document.addEventListener("click", () => {
   console.log("Audio unlocked");
 });
 
+function updateLayout() {
+  const count = activeKeys.size;
+
+  Object.entries(videos).forEach(([key, v]) => {
+    if (!activeKeys.has(key)) {
+      v.pause();
+      v.style.display = "none";
+      v.classList.remove("full", "multi");
+      return;
+    }
+
+    v.style.display = "block";
+
+    if (count === 1) {
+      // SOLO → full frame
+      v.classList.add("full");
+      v.classList.remove("multi");
+    } else {
+      // MULTI → cropped
+      v.classList.remove("full");
+      v.classList.add("multi");
+    }
+  });
+}
+
 document.addEventListener("keydown", (e) => {
   if (!unlocked) return;
 
   const key = e.key.toLowerCase();
   const v = videos[key];
+  if (!v || activeKeys.has(key)) return;
 
-  if (v && v.paused) {
-    v.currentTime = 0;
-    v.style.display = "block";
+  activeKeys.add(key);
 
-    // REQUIRED for sound
-    v.muted = false;
-    v.volume = 1.0;
+  v.muted = false;
+  v.volume = 1.0;
+  v.currentTime = 0;
+  v.play().catch(err => console.warn(err));
 
-    v.play().catch(err => {
-      console.warn("Playback blocked:", err);
-    });
-  }
+  updateLayout();
 });
 
 document.addEventListener("keyup", (e) => {
   const key = e.key.toLowerCase();
-  const v = videos[key];
+  if (!videos[key]) return;
 
-  if (v) {
-    v.pause();
-    v.style.display = "none";
-  }
+  activeKeys.delete(key);
+  updateLayout();
 });
 </script>
 
 </body>
 </html>
+
