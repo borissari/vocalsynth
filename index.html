@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Audiosynth V.2.1</title>
+<title>Audiosynth V.2.2</title>
 
 <style>
   body {
@@ -11,76 +11,78 @@
     overflow: hidden;
   }
 
-
-  /* 3등분 위치 */
-  #v_s {
+  .vid {
     display: none;
     position: absolute;
-    top: 30;
     height: 50vh;
-    object-fit: cover;
-    left: 10;
     width: 50vw;
+    object-fit: cover;
+  }
+
+  #v_s {
+    top: 30px;
+    left: 10px;
   }
 
   #v_d {
-    display: none;
-    position: absolute;
-    top: 20;
-    height: 50vh;
-    object-fit: cover;
+    top: 20px;
     left: 20vw;
-    width: 50vw;
   }
 
   #v_f {
-    display: none;
-    position: absolute;
-    top: 10;
-    height: 50vh;
-    object-fit: cover;
+    top: 10px;
     left: 30vw;
-    width: 50vw;
   }
 </style>
 </head>
 
 <body>
 
-<!-- 여기에 네 영상 파일명 넣기 -->
-<video id="v_s" class="vid" src="IMG_6797.mov"></video>
-<video id="v_d" class="vid" src="IMG_8721.mov"></video>
-<video id="v_f" class="vid" src="filtered-EF866004-E8A0-4EA5-AFE8-DC5900FE4DEF 2.mov"></video>
+<h2 style="color:white; position:fixed; top:10px; left:10px;">
+Click once, then hold S / D / F
+</h2>
+
+<video id="v_s" class="vid" src="IMG_6797.mov" muted loop></video>
+<video id="v_d" class="vid" src="IMG_8721.mov" muted loop></video>
+<video id="v_f" class="vid" src="filtered-EF866004-E8A0-4EA5-AFE8-DC5900FE4DEF 2.mov" muted loop></video>
 
 <script>
-  const videos = {
-    's': document.getElementById('v_s'),
-    'd': document.getElementById('v_d'),
-    'f': document.getElementById('v_f')
-  };
+let unlocked = false;
 
-  document.addEventListener("keydown", function(e) {
-    const key = e.key.toLowerCase();
-    let v = videos[key];
+const videos = {
+  's': document.getElementById('v_s'),
+  'd': document.getElementById('v_d'),
+  'f': document.getElementById('v_f')
+};
 
-    if (v && !v.isPlaying) {
-      v.currentTime = 0;
-      v.style.display = "block";
-      v.play();
-      v.isPlaying = true;
-    }
-  });
+// Unlock playback
+document.addEventListener("click", () => {
+  unlocked = true;
+  console.log("Media unlocked");
+});
 
-  document.addEventListener("keyup", function(e) {
-    const key = e.key.toLowerCase();
-    let v = videos[key];
+document.addEventListener("keydown", (e) => {
+  if (!unlocked) return;
 
-    if (v) {
-      v.pause();
-      v.style.display = "none";
-      v.isPlaying = false;
-    }
-  });
+  const key = e.key.toLowerCase();
+  const v = videos[key];
+
+  if (v && v.paused) {
+    v.currentTime = 0;
+    v.style.display = "block";
+    v.play();
+  }
+});
+
+document.addEventListener("keyup", (e) => {
+  const key = e.key.toLowerCase();
+  const v = videos[key];
+
+  if (v) {
+    v.pause();
+    v.style.display = "none";
+  }
+});
 </script>
 
 </body>
