@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Audiosynth V.2.2</title>
+<title>Audiosynth V.2.3</title>
 
 <style>
   body {
@@ -19,46 +19,43 @@
     object-fit: cover;
   }
 
-  #v_s {
-    top: 30px;
-    left: 10px;
-  }
-
-  #v_d {
-    top: 20px;
-    left: 20vw;
-  }
-
-  #v_f {
-    top: 10px;
-    left: 30vw;
-  }
+  #v_z { top: 30px; left: 5vw; }
+  #v_c { top: 20px; left: 20vw; }
+  #v_b { top: 10px; left: 35vw; }
+  #v_m { top: 40px; left: 50vw; }
+  #v_dot { top: 25px; left: 65vw; }
 </style>
 </head>
 
 <body>
 
 <h2 style="color:white; position:fixed; top:10px; left:10px;">
-Click once, then hold S / D / F
+CLICK once → then hold Z C B M .
 </h2>
 
-<video id="v_s" class="vid" src="IMG_6797.mov" muted loop></video>
-<video id="v_d" class="vid" src="IMG_8721.mov" muted loop></video>
-<video id="v_f" class="vid" src="filtered-EF866004-E8A0-4EA5-AFE8-DC5900FE4DEF 2.mov" muted loop></video>
+<video id="v_z" class="vid" src="IMG_6797.mov" loop playsinline></video>
+<video id="v_c" class="vid" src="IMG_8721.mov" loop playsinline></video>
+<video id="v_b" class="vid" src="filtered-EF866004-E8A0-4EA5-AFE8-DC5900FE4DEF 2.mov" loop playsinline></video>
+
+<!-- reuse if needed -->
+<video id="v_m" class="vid" src="IMG_6797.mov" loop playsinline></video>
+<video id="v_dot" class="vid" src="IMG_8721.mov" loop playsinline></video>
 
 <script>
 let unlocked = false;
 
 const videos = {
-  's': document.getElementById('v_s'),
-  'd': document.getElementById('v_d'),
-  'f': document.getElementById('v_f')
+  "z": document.getElementById("v_z"),
+  "c": document.getElementById("v_c"),
+  "b": document.getElementById("v_b"),
+  "m": document.getElementById("v_m"),
+  ".": document.getElementById("v_dot")
 };
 
-// Unlock playback
+// 🔓 Unlock audio/video on click
 document.addEventListener("click", () => {
   unlocked = true;
-  console.log("Media unlocked");
+  console.log("Audio unlocked");
 });
 
 document.addEventListener("keydown", (e) => {
@@ -70,7 +67,14 @@ document.addEventListener("keydown", (e) => {
   if (v && v.paused) {
     v.currentTime = 0;
     v.style.display = "block";
-    v.play();
+
+    // REQUIRED for sound
+    v.muted = false;
+    v.volume = 1.0;
+
+    v.play().catch(err => {
+      console.warn("Playback blocked:", err);
+    });
   }
 });
 
