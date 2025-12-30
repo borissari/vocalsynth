@@ -2,158 +2,163 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>YOU → PAUSE → ME (Stable)</title>
-
+<title>Vocalsynth ME Phase Demo</title>
 <style>
-body {
-  margin: 0;
-  background: black;
-  overflow: hidden;
-}
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: black;
+  }
 
-/* Stage = middle 1/3 width, full height */
-#stage {
-  position: absolute;
-  left: 33.333vw;
-  width: 33.333vw;
-  height: 100vh;
-  overflow: hidden;
-  background: #111;
-}
+  #stage {
+    position: absolute;
+    left: 33.333vw; /* middle third of screen */
+    width: 33.333vw;
+    height: 100vh;
+    background: #111;
+    overflow: hidden;
+  }
 
-/* Video base */
-video {
-  position: absolute;
-  object-fit: cover;
-  opacity: 0;
-  transition: none;
-}
+  video {
+    position: absolute;
+    object-fit: cover;
+    transition: all 2s ease; /* smooth movement */
+  }
+
+  #info {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    color: #fff;
+    font-family: monospace;
+  }
 </style>
 </head>
-
 <body>
 
 <div id="stage"></div>
+<div id="info">
+  Keys pressed: <span id="keys">0</span><br>
+  Phase: <span id="phase">YOU</span>
+</div>
 
 <script>
-/* ---------------- CONFIG ---------------- */
-
-const FILES = {
-  z: "vocalsynth_ethan.mp4",
-  c: "vocalsynth_bryan.mp4",
-  b: "vocalsynth_dad.mp4",
-  m: "vocalsynth_monsang.mp4",
-  ".": "vocalsynth_mom.mp4"
+const VIDEO_MAPPING = {
+  z: 'vocalsynth_ethan.mp4',
+  c: 'vocalsynth_bryan.mp4',
+  b: 'vocalsynth_dad.mp4',
+  m: 'vocalsynth_monsang.mp4',
+  '.': 'vocalsynth_mom.mp4'
 };
 
-/* YOU positions (scattered) */
-const YOU = {
-  z:{x:5,y:5,w:40,h:40},
-  c:{x:55,y:5,w:40,h:40},
-  b:{x:5,y:55,w:40,h:40},
-  m:{x:55,y:55,w:40,h:40},
-  ".":{x:30,y:30,w:40,h:40}
+const SCATTERED = {
+  z: {x:10, y:10, width:35, height:35},
+  c: {x:55, y:10, width:35, height:35},
+  b: {x:10, y:55, width:35, height:35},
+  m: {x:55, y:55, width:35, height:35},
+  '.': {x:32.5, y:32.5, width:35, height:35}
 };
 
-/* ME target (all overlap & fill height) */
-const ME = {
-  x:0,
-  y:0,
-  w:100,
-  h:100
+const state = {
+  keysDown: new Set(),
+  videos: {},
+  meCommitted: false
 };
 
-/* ---------------- STATE ---------------- */
+const stage = document.getElementById('stage');
 
-const stage = document.getElementById("stage");
-const vids = {};
-const keys = new Set();
-
-let phase = "YOU";
-let pauseStart = 0;
-
-/* ---------------- SETUP ---------------- */
-
-for (const k in FILES) {
-  const v = document.createElement("video");
-  v.src = FILES[k];
-  v.preload = "auto";
-  v.muted = false;
-  v.playsInline = true;
-  stage.appendChild(v);
-  vids[k] = v;
+// create video elements
+for (const [key, src] of Object.entries(VIDEO_MAPPING)) {
+  const vid = document.createElement('video');
+  vid.src = src;
+  vid.muted = false;
+  vid.style.display = 'none';
+  vid.preload = 'auto';
+  stage.appendChild(vid);
+  state.videos[key] = vid;
 }
 
-/* ---------------- HELPERS ---------------- */
-
-function setRect(v, r) {
-  v.style.left = r.x + "%";
-  v.style.top = r.y + "%";
-  v.style.width = r.w + "%";
-  v.style.height = r.h + "%";
+// utility to set position/size
+function setVideoPos(key, pos) {
+  const v = state.videos[key];
+  v.style.left = pos.x + '%';
+  v.style.top = pos.y + '%';
+  v.style.width = pos.width + '%';
+  v.style.height = pos.height + '%';
+  if(pos.opacity!==undefined)v.style.opacity = pos.opacity;
 }
 
-function lerp(a,b,t){ return a+(b-a)*t; }
+// keydown
+document.addEventListener('keydown', e=>{
+  const key = e.key.toLowerCase();
+  if(!VIDEO_MAPPING[key] || state.keysDown.has(key)) return;
+  state.keysDown.add(key);
+  document.getElementById('keys').textContent = state.keysDown.size;
 
-/* ---------------- INPUT ---------------- */
+  const vid = state.videos[key];
+  vid.style.display = 'block';
+  setVideoPos(key, SCATTERED[key]);
+  vid.currentTime = 0;
+  vid.play();
 
-document.addEventListener("keydown", e=>{
-  const k = e.key.toLowerCase();
-  if (!vids[k] || keys.has(k)) return;
-
-  keys.add(k);
-  const v = vids[k];
-
-  setRect(v, YOU[k]);
-  v.style.opacity = 0.5;
-  v.style.display = "block";
-  v.play();
-
-  if (keys.size === 5 && phase === "YOU") {
-    phase = "PAUSE";
-    pauseStart = performance.now();
-  }
-});
-
-document.addEventListener("keyup", e=>{
-  const k = e.key.toLowerCase();
-  if (!vids[k]) return;
-
-  keys.delete(k);
-  if (phase === "YOU") {
-    vids[k].pause();
-    vids[k].style.opacity = 0;
-  }
-});
-
-/* ---------------- LOOP ---------------- */
-
-function loop(now){
-  if (phase === "PAUSE") {
-    const t = Math.min((now - pauseStart)/2000,1);
-
-    for (const k in vids) {
-      const v = vids[k];
-      const a = YOU[k];
-
-      setRect(v,{
-        x:lerp(a.x,ME.x,t),
-        y:lerp(a.y,ME.y,t),
-        w:lerp(a.w,ME.w,t),
-        h:lerp(a.h,ME.h,t)
-      });
-
-      v.style.opacity = lerp(0.5,0.85,t);
+  // all 5 pressed → commit ME
+  if(state.keysDown.size === 5 && !state.meCommitted){
+    state.meCommitted = true;
+    document.getElementById('phase').textContent = 'PAUSE → ME';
+    
+    // move videos to center, full screen height, low opacity
+    for(const [k,v] of Object.entries(state.videos)){
+      v.style.left = '0';
+      v.style.top = '0';
+      v.style.height = window.innerHeight + 'px';
+      v.style.width = 'auto';
+      v.style.opacity = 0.3;
     }
-
-    if (t===1) phase="ME";
   }
+});
 
-  requestAnimationFrame(loop);
+// keyup
+document.addEventListener('keyup', e=>{
+  const key = e.key.toLowerCase();
+  if(!VIDEO_MAPPING[key]) return;
+  state.keysDown.delete(key);
+  document.getElementById('keys').textContent = state.keysDown.size;
+
+  // if ME committed, videos continue
+  if(!state.meCommitted){
+    const vid = state.videos[key];
+    vid.pause();
+    vid.currentTime = 0;
+    vid.style.display = 'none';
+  }
+});
+
+// monitor when all videos end
+function checkVideosEnd(){
+  if(!state.meCommitted) return;
+  let allEnded = true;
+  for(const v of Object.values(state.videos)){
+    if(!v.ended) { allEnded=false; break; }
+  }
+  if(allEnded){
+    // reset
+    for(const [k,v] of Object.entries(state.videos)){
+      v.pause();
+      v.currentTime = 0;
+      v.style.display = 'none';
+      v.style.opacity = 1;
+      setVideoPos(k, SCATTERED[k]);
+    }
+    state.keysDown.clear();
+    state.meCommitted = false;
+    document.getElementById('phase').textContent = 'YOU';
+    document.getElementById('keys').textContent = '0';
+  }
+  requestAnimationFrame(checkVideosEnd);
 }
+checkVideosEnd();
 
-requestAnimationFrame(loop);
 </script>
-
 </body>
 </html>
+
