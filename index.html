@@ -1,74 +1,81 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>VocalSynth V.4.1</title>
+<title>Vocalsynth – V.4.3</title>
 
 <style>
-  body {
-    margin: 0;
-    background: black;
-    overflow: hidden;
-  }
+body {
+  background: black;
+  margin: 0;
+  overflow: hidden;
+}
 
-  /* central screen area */
-  #screen {
-    position: absolute;
-    left: 33vw;
-    width: 34vw;
-    top: 2cm;
-    bottom: 2cm;
-    border: 2px solid #333;
-  }
+#stage {
+  position: absolute;
+  top: 2cm;
+  bottom: 2cm;
+  left: 33vw;
+  width: 34vw;
+  border: 2px solid #444;
+}
 
-  .vid, .square {
-    position: absolute;
-    width: 30%;
-    height: 30%;
-    display: none;
-    object-fit: cover;
-    transition: all 1s ease;
-  }
+/* video blocks */
+.clip {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  display: none;
+  object-fit: cover;
+  transition: none;
+}
 
-  /* normal spread positions */
-  #z { top: 0; left: 0; }
-  #c { top: 0; right: 0; }
-  #b { bottom: 0; left: 0; }
-  #m { bottom: 0; right: 0; }
-  #dot { top: 35%; left: 35%; }
+/* starting scattered positions (YOU) */
+.start-z { left: 65%; top: 10%; }
+.start-c { left: 15%; top: 10%; }
+.start-b { left: 65%; top: 65%; }
+.start-m { left: 15%; top: 65%; }
+.start-dot { left: 40%; top: 40%; }
 
-  /* FACE POSITIONS */
-  .face-z { top: 10%; left: 20%; width: 25%; height: 20%; object-position: center 20%; }
-  .face-c { top: 10%; right: 20%; width: 25%; height: 20%; }
-  .face-b { top: 35%; left: 37%; width: 25%; height: 25%; object-position: center 50%; }
-  .face-m { bottom: 15%; left: 35%; width: 30%; height: 20%; object-position: center 80%; }
-  .face-dot { top: 30%; right: 5%; width: 20%; height: 40%; object-position: 80% center; }
+/* face positions (ME) */
+.face-z { left: 35%; top: 25%; }   /* left eye */
+.face-c { left: 50%; top: 25%; }   /* right eye */
+.face-b { left: 42%; top: 40%; }   /* nose */
+.face-m { left: 35%; top: 55%; }   /* mouth */
+.face-dot { left: 50%; top: 55%; } /* mouth */
 
-  .square {
-    background: #444;
-    color: white;
-    font-size: 24px;
-    display: none;
-    align-items: center;
-    justify-content: center;
-  }
 </style>
 </head>
 
 <body>
 
-<div id="screen">
+<div id="stage">
 
-  <video id="z" class="vid" src="vocalsynth_ethan.mp4" muted playsinline></video>
-  <div id="c" class="square">C</div>
-  <video id="b" class="vid" src="vocalsynth_dad.mp4" muted playsinline></video>
-  <video id="m" class="vid" src="vocalsynth_monsang.mp4" muted playsinline></video>
-  <video id="dot" class="vid" src="vocalsynth_mom.mp4" muted playsinline></video>
+  <video id="z" class="clip start-z"
+    src="vocalsynth_ethan.mp4" playsinline></video>
+
+  <!-- C is placeholder -->
+  <div id="c" class="clip start-c"
+    style="background:#333;color:white;font-family:monospace;
+           display:none;align-items:center;justify-content:center;">
+    C
+  </div>
+
+  <video id="b" class="clip start-b"
+    src="vocalsynth_dad.mp4" playsinline></video>
+
+  <video id="m" class="clip start-m"
+    src="vocalsynth_monsang.mp4" playsinline></video>
+
+  <video id="dot" class="clip start-dot"
+    src="vocalsynth_mom.mp4" playsinline></video>
 
 </div>
 
 <script>
-const keys = {
+/* ---------------- SETUP ---------------- */
+
+const clips = {
   z: document.getElementById("z"),
   c: document.getElementById("c"),
   b: document.getElementById("b"),
@@ -76,61 +83,104 @@ const keys = {
   ".": document.getElementById("dot")
 };
 
-let pressed = new Set();
-let faceMode = false;
+const pressed = new Set();
+let clock = 0;
+let committed = false;
+let lastTime = performance.now();
+
+/* ---------------- INPUT ---------------- */
 
 document.addEventListener("keydown", e => {
-  const k = e.key.toLowerCase();
-  if (!keys[k]) return;
-  if (pressed.has(k)) return;
+  const key = e.key.toLowerCase();
+  const el = clips[key];
+  if (!el || pressed.has(key)) return;
 
-  pressed.add(k);
-  const el = keys[k];
-
-  el.style.display = "flex";
+  pressed.add(key);
+  el.style.display = "block";
 
   if (el.tagName === "VIDEO") {
     el.currentTime = 0;
-    el.muted = false;
     el.play();
   }
 
-  checkAllPressed();
+  if (pressed.size === 1 && !committed) clock = 0;
 });
 
 document.addEventListener("keyup", e => {
-  const k = e.key.toLowerCase();
-  if (!keys[k]) return;
+  const key = e.key.toLowerCase();
+  if (!clips[key]) return;
 
-  pressed.delete(k);
+  pressed.delete(key);
 
-  if (!faceMode) {
-    const el = keys[k];
-    if (el.tagName === "VIDEO") {
-      el.pause();
-      el.currentTime = 0;
-    }
+  if (!committed) {
+    const el = clips[key];
     el.style.display = "none";
+    if (el.tagName === "VIDEO") el.pause();
   }
 });
 
-function checkAllPressed() {
-  if (pressed.size === 5 && !faceMode) {
-    faceMode = true;
+/* ---------------- ANIMATION LOOP ---------------- */
 
-    setTimeout(() => {
-      keys.z.classList.add("face-z");
-      keys.c.classList.add("face-c");
-      keys.b.classList.add("face-b");
-      keys.m.classList.add("face-m");
-      keys["."].classList.add("face-dot");
+function update(now) {
+  const dt = (now - lastTime) / 1000;
+  lastTime = now;
 
-      Object.values(keys).forEach(el => {
-        if (el.tagName === "VIDEO") el.play();
-      });
-    }, 300);
+  if (pressed.size > 0 || committed) clock += dt;
+
+  // YOU loop prevention (no looping, just cap)
+  if (!committed && clock > 5) clock = 5;
+
+  // commit ME
+  if (!committed && pressed.size === 5) {
+    committed = true;
   }
+
+  // MOVE + CROP during PAUSE (5–7)
+  if (clock >= 5 && clock < 7) {
+    const a = (clock - 5) / 2;
+
+    Object.entries(clips).forEach(([k, el]) => {
+      if (el.style.display === "none") return;
+
+      el.style.transition = "left 0.1s linear, top 0.1s linear";
+      el.classList.remove("start-" + k);
+      el.classList.add("face-" + k);
+
+      // crop illusion
+      if (el.tagName === "VIDEO") {
+        el.style.objectPosition =
+          `${50 + (Math.random() * 20 - 10)}% ${50 + (Math.random() * 20 - 10)}%`;
+      }
+    });
+  }
+
+  // lock ME
+  if (clock >= 7) {
+    Object.entries(clips).forEach(([k, el]) => {
+      el.classList.remove("start-" + k);
+      el.classList.add("face-" + k);
+    });
+  }
+
+  // RESET after ME ends
+  if (committed && clock >= 12) {
+    clock = 0;
+    committed = false;
+    pressed.clear();
+
+    Object.values(clips).forEach(el => {
+      el.style.display = "none";
+      if (el.tagName === "VIDEO") {
+        el.pause();
+        el.currentTime = 0;
+      }
+    });
+  }
+
+  requestAnimationFrame(update);
 }
+
+requestAnimationFrame(update);
 </script>
 
 </body>
