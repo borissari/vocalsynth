@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vocalsynth</title>
+    <title>Vocalsynth v1</title>
     <style>
         * {
             margin: 0;
@@ -184,14 +184,6 @@
                 const t = Math.min(elapsed / PHASE_TIMING.PAUSE, 1);
                 const easedT = easeInOutCubic(t);
                 
-                // Update synchronized video times
-                const syncTime = elapsed;
-                for (const key of Object.keys(VIDEO_MAPPING)) {
-                    const video = state.videoElements[key];
-                    const startTime = state.pauseVideoTimes[key] || 0;
-                    video.currentTime = startTime + syncTime;
-                }
-                
                 // Interpolate positions
                 for (const key of Object.keys(VIDEO_MAPPING)) {
                     const start = state.scatteredPos[key];
@@ -213,16 +205,9 @@
                 }
             }
             
-            // ME PHASE: Keep videos synchronized
+            // ME PHASE: Just wait for completion
             if (state.phase === 'ME') {
                 const elapsed = (Date.now() - state.meStartTime) / 1000;
-                const syncTime = PHASE_TIMING.PAUSE + elapsed;
-                
-                for (const key of Object.keys(VIDEO_MAPPING)) {
-                    const video = state.videoElements[key];
-                    const startTime = state.pauseVideoTimes[key] || 0;
-                    video.currentTime = startTime + syncTime;
-                }
                 
                 // Reset after ME phase completes
                 if (elapsed >= PHASE_TIMING.ME) {
