@@ -2,46 +2,67 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Vocalsynth V.3.1</title>
+<title>vocalsynth V.3.2</title>
 
 <style>
-  body {
-    margin: 0;
-    background: black;
-    overflow: hidden;
-  }
+body {
+  margin: 0;
+  background: black;
+  overflow: hidden;
+  font-family: monospace;
+}
 
-  /* ===== SCREEN AREA ===== */
-  #screen {
-    position: absolute;
-    left: 33.33vw;              /* middle 1/3 horizontally */
-    width: 33.33vw;
-    top: 2cm;
-    bottom: 2cm;
-    overflow: hidden;
-  }
+/* ===== SCREEN ===== */
+#screen {
+  position: absolute;
+  left: 33.33vw;
+  width: 33.33vw;
+  top: 2cm;
+  bottom: 2cm;
+}
 
-  /* ===== VIDEO BASE ===== */
-  .vid {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: none;
-    transition:
-      top 2s ease,
-      left 2s ease,
-      width 2s ease,
-      height 2s ease,
-      object-position 2s ease;
-  }
+/* ===== PLAYER WRAPPER ===== */
+.player {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  display: none;
+  overflow: hidden;
+  transition: all 2s ease;
+}
 
-  /* ===== FACE FORMATION (during PAUSE) ===== */
-  .face-z   { top: 0%;   left: 25%; width: 50%; height: 40%; object-position: center top; }
-  .face-c   { top: 40%;  left: 0%;  width: 50%; height: 30%; object-position: left center; }
-  .face-b   { top: 40%;  left: 50%; width: 50%; height: 30%; object-position: right center; }
-  .face-m   { top: 70%;  left: 25%; width: 50%; height: 30%; object-position: center bottom; }
-  .face-dot { top: 25%;  left: 25%; width: 50%; height: 50%; object-position: center center; }
+/* ===== VIDEO ===== */
+.player video {
+  width: 130%;
+  height: 130%;
+  object-fit: cover;
+  transition: transform 2s ease;
+}
+
+/* ===== SQUARE (C) ===== */
+.square {
+  width: 100%;
+  height: 100%;
+  background: #aaa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+/* ===== FACE POSITIONS ===== */
+.face-z   { top: 0%;   left: 25%; width: 50%; height: 35%; }
+.face-c   { top: 35%;  left: 0%;  width: 50%; height: 30%; }
+.face-b   { top: 35%;  left: 50%; width: 50%; height: 30%; }
+.face-m   { top: 65%;  left: 25%; width: 50%; height: 35%; }
+.face-dot { top: 25%;  left: 25%; width: 50%; height: 50%; }
+
+/* ===== CROPS ===== */
+.crop-z   video { transform: translateY(-10%); }
+.crop-b   video { transform: translateX(-15%); }
+.crop-m   video { transform: translateY(-25%); }
+.crop-dot video { transform: scale(1.1); }
+
 </style>
 </head>
 
@@ -49,146 +70,143 @@
 
 <div id="screen">
 
-  <video id="v_z"   class="vid" src="vocalsynth_ethan.mp4"   playsinline></video>
-  <!-- c intentionally skipped -->
-  <video id="v_b"   class="vid" src="vocalsynth_dad.mp4"     playsinline></video>
-  <video id="v_m"   class="vid" src="vocalsynth_monsang.mp4" playsinline></video>
-  <video id="v_dot" class="vid" src="vocalsynth_mom.mp4"     playsinline></video>
+  <div id="p_z" class="player">
+    <video src="vocalsynth_ethan.mp4"></video>
+  </div>
+
+  <div id="p_c" class="player">
+    <div class="square" id="square_c"></div>
+  </div>
+
+  <div id="p_b" class="player">
+    <video src="vocalsynth_dad.mp4"></video>
+  </div>
+
+  <div id="p_m" class="player">
+    <video src="vocalsynth_monsang.mp4"></video>
+  </div>
+
+  <div id="p_dot" class="player">
+    <video src="vocalsynth_mom.mp4"></video>
+  </div>
 
 </div>
 
 <script>
-/* ===== TIMING (seconds) ===== */
-const YOU_END   = 5;
+/* ===== TIME ===== */
+const YOU_START = 1;
+const YOU_END = 5;
 const PAUSE_END = 7;
-const ME_END    = 12;
+const ME_END = 12;
 
-/* ===== VIDEO MAP ===== */
-const videos = {
-  z:   document.getElementById("v_z"),
-  b:   document.getElementById("v_b"),
-  m:   document.getElementById("v_m"),
-  ".": document.getElementById("v_dot")
-  // c intentionally omitted
+/* ===== PLAYERS ===== */
+const players = {
+  z:   { el: p_z,   video: p_z.querySelector("video"), time: 1 },
+  c:   { el: p_c,   video: null, time: 1 },
+  b:   { el: p_b,   video: p_b.querySelector("video"), time: 1 },
+  m:   { el: p_m,   video: p_m.querySelector("video"), time: 1 },
+  ".": { el: p_dot, video: p_dot.querySelector("video"), time: 1 }
 };
 
-const faceClasses = {
-  z:   "face-z",
-  c:   "face-c",
-  b:   "face-b",
-  m:   "face-m",
-  ".": "face-dot"
-};
-
-const activeKeys = new Set();
+const active = new Set();
+let faceMode = false;
 let meCommitted = false;
-let faceScheduled = false;
-let unlock = false;
 
-/* ===== UNLOCK AUTOPLAY ===== */
-document.addEventListener("click", () => unlock = true);
+/* ===== CLOCK ===== */
+setInterval(() => {
+  Object.entries(players).forEach(([k, p]) => {
+    if (!active.has(k) && !meCommitted) return;
 
-/* ===== KEYDOWN ===== */
+    p.time += 0.016;
+
+    if (!meCommitted && active.size < 5 && p.time > YOU_END) {
+      p.time = YOU_START;
+      if (p.video) p.video.currentTime = YOU_START;
+    }
+
+    if (meCommitted && p.time > ME_END) resetAll();
+
+    if (k === "c") {
+      square_c.innerHTML = `
+        <div>${phase(p.time)}</div>
+        <div>${p.time.toFixed(2)}s</div>
+      `;
+    }
+  });
+}, 16);
+
+function phase(t) {
+  if (t < YOU_END) return "YOU";
+  if (t < PAUSE_END) return "PAUSE";
+  return "ME";
+}
+
+/* ===== INPUT ===== */
 document.addEventListener("keydown", e => {
-  if (!unlock || meCommitted) return;
-
   const k = e.key.toLowerCase();
-  const v = videos[k];
-  if (!v || activeKeys.has(k)) return;
+  if (!(k in players) || active.has(k)) return;
 
-  activeKeys.add(k);
+  active.add(k);
+  const p = players[k];
+  p.el.style.display = "block";
 
-  v.style.display = "block";
-  v.muted = false;
-  v.volume = 1;
+  if (p.video) {
+    p.video.currentTime = p.time;
+    p.video.play();
+  }
 
-  if (v.paused) v.play();
-
-  checkAllPressed();
+  if (active.size === 5) triggerFaceMode();
 });
 
-/* ===== KEYUP ===== */
 document.addEventListener("keyup", e => {
   if (meCommitted) return;
-
   const k = e.key.toLowerCase();
-  const v = videos[k];
-  if (!v) return;
+  if (!(k in players)) return;
 
-  activeKeys.delete(k);
-  v.pause();
-  v.currentTime = 0;
-  v.style.display = "none";
+  active.delete(k);
+  players[k].el.style.display = "none";
 });
 
-/* ===== LOOP CONTROL ===== */
-setInterval(() => {
-  if (meCommitted) return;
+/* ===== FACE MODE ===== */
+function triggerFaceMode() {
+  faceMode = true;
 
-  Object.values(videos).forEach(v => {
-    if (v.paused || v.currentTime < YOU_END) return;
-    if (activeKeys.size < 4) v.currentTime = 0; // YOU loop
+  const master = players.z.time;
+  Object.values(players).forEach(p => {
+    p.time = master;
+    if (p.video) p.video.currentTime = master;
   });
-}, 50);
-
-/* ===== ALL PRESSED LOGIC ===== */
-function checkAllPressed() {
-  if (activeKeys.size === 4 && !faceScheduled) {
-    faceScheduled = true;
-    syncAndScheduleFace();
-  }
-}
-
-function syncAndScheduleFace() {
-  const master = videos.z.currentTime;
-
-  Object.values(videos).forEach(v => v.currentTime = master);
-
-  const delay =
-    master < YOU_END
-      ? YOU_END - master
-      : ME_END - master + YOU_END;
 
   setTimeout(() => {
-    moveToFace();
-    setTimeout(startMePhase, (PAUSE_END - YOU_END) * 1000);
-  }, delay * 1000);
-}
+    Object.entries(players).forEach(([k, p]) => {
+      p.el.classList.add(`face-${k === "." ? "dot" : k}`);
+      p.el.classList.add(`crop-${k === "." ? "dot" : k}`);
+    });
+  }, (YOU_END - master) * 1000);
 
-/* ===== FACE MOVE ===== */
-function moveToFace() {
-  Object.entries(videos).forEach(([k, v]) => {
-    v.classList.add(faceClasses[k]);
-  });
-}
-
-/* ===== ME PHASE ===== */
-function startMePhase() {
-  meCommitted = true;
-  Object.values(videos).forEach(v => v.play());
-
-  const checkEnd = setInterval(() => {
-    if (videos.z.currentTime >= ME_END) {
-      clearInterval(checkEnd);
-      resetAll();
-    }
-  }, 100);
+  setTimeout(() => {
+    meCommitted = true;
+  }, (PAUSE_END - master) * 1000);
 }
 
 /* ===== RESET ===== */
 function resetAll() {
   meCommitted = false;
-  faceScheduled = false;
-  activeKeys.clear();
+  faceMode = false;
+  active.clear();
 
-  Object.entries(videos).forEach(([k, v]) => {
-    v.pause();
-    v.currentTime = 0;
-    v.style.display = "none";
-    v.classList.remove(faceClasses[k]);
+  Object.values(players).forEach(p => {
+    p.time = YOU_START;
+    p.el.style.display = "none";
+    p.el.className = "player";
+    if (p.video) {
+      p.video.pause();
+      p.video.currentTime = YOU_START;
+    }
   });
 }
 </script>
 
 </body>
 </html>
+
