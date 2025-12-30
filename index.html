@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>vocalsynthV.3.3</title>
+<title>Vocalsynth V.3.4</title>
 
 <style>
   body {
@@ -20,13 +20,17 @@
     overflow: hidden;
   }
 
-  video {
+  video, .placeholder {
     position: absolute;
     width: 40%;
     height: 40%;
     object-fit: cover;
     display: none;
-    transition: none;
+  }
+
+  .placeholder {
+    background: #222;
+    border: 2px solid #666;
   }
 </style>
 </head>
@@ -35,141 +39,101 @@
 
 <div id="stage">
   <video id="z" src="vocalsynth_ethan.mp4" playsinline></video>
+  <div id="c" class="placeholder"></div>
   <video id="b" src="vocalsynth_dad.mp4" playsinline></video>
   <video id="m" src="vocalsynth_monsang.mp4" playsinline></video>
   <video id="dot" src="vocalsynth_mom.mp4" playsinline></video>
-
-  <!-- placeholder for C -->
-  <div id="c" style="display:none"></div>
 </div>
 
 <script>
-/* ---------------- SETUP ---------------- */
-
-const videos = {
+const items = {
   z: document.getElementById("z"),
+  c: document.getElementById("c"), // placeholder
   b: document.getElementById("b"),
   m: document.getElementById("m"),
   ".": document.getElementById("dot")
 };
-
-// YOU positions
-const startPos = {
-  z: { x: 55, y: 5 },
-  b: { x: 55, y: 55 },
-  m: { x: 5,  y: 55 },
-  ".": { x: 5,  y: 5 }
-};
-
-// ME face positions
-const facePos = {
-  z: { x: 30, y: 25 }, // eye
-  b: { x: 45, y: 40 }, // nose
-  m: { x: 30, y: 55 }, // mouth
-  ".": { x: 45, y: 55 }
-};
-
-function setPosition(v, pos) {
-  v.style.left = pos.x + "%";
-  v.style.top  = pos.y + "%";
-}
-
-/* ---------------- TIMING ---------------- */
 
 const pressed = new Set();
 let clock = 0;
 let meCommitted = false;
 let lastTime = performance.now();
 
-/* ---------------- INPUT ---------------- */
+// YOU positions
+const startPos = { z:{x:55,y:5}, c:{x:45,y:5}, b:{x:55,y:55}, m:{x:5,y:55}, ".":{x:5,y:5} };
+// ME positions (face)
+const facePos  = { z:{x:30,y:25}, c:{x:50,y:30}, b:{x:45,y:40}, m:{x:30,y:55}, ".":{x:45,y:55} };
 
-document.addEventListener("click", () => {
-  Object.values(videos).forEach(v => v.muted = false);
-});
+function setPosition(el,pos){el.style.left=pos.x+"%";el.style.top=pos.y+"%";}
 
-document.addEventListener("keydown", e => {
+document.addEventListener("keydown", e=>{
   const key = e.key.toLowerCase();
-  const v = videos[key];
-  if (!v || pressed.has(key)) return;
-
+  if(!items[key]||pressed.has(key)) return;
   pressed.add(key);
-  v.style.display = "block";
-  v.currentTime = 0;
-  setPosition(v, startPos[key]);
-  v.play();
-
-  if (pressed.size === 1 && !meCommitted) clock = 0;
+  items[key].style.display="block";
+  setPosition(items[key], startPos[key]);
+  if(pressed.size===1 && !meCommitted) clock=0;
 });
 
-document.addEventListener("keyup", e => {
+document.addEventListener("keyup", e=>{
   const key = e.key.toLowerCase();
-  const v = videos[key];
-  if (!v) return;
-
+  if(!items[key]) return;
   pressed.delete(key);
-
-  if (!meCommitted) {
-    v.pause();
-    v.style.display = "none";
-  }
+  if(!meCommitted) items[key].style.display="none";
 });
 
-/* ---------------- LOOP ---------------- */
+function update(now){
+  const dt=(now-lastTime)/1000;
+  lastTime=now;
 
-function update(now) {
-  const dt = (now - lastTime) / 1000;
-  lastTime = now;
+  const activeCount=pressed.size;
 
-  const activeCount = pressed.size;
+  if(activeCount>0 || meCommitted) clock+=dt;
 
-  if (activeCount > 0 || meCommitted) {
-    clock += dt;
-  }
-
-  // YOU loop (1–5)
-  if (!meCommitted && activeCount < 4) {
-    Object.values(videos).forEach(v => {
-      if (v.style.display !== "none" && v.currentTime >= 5) {
-        v.currentTime = 1;
-      }
-    });
+  // YOU loop 1-5
+  if(!meCommitted && activeCount<5){
+    if(clock>=5) clock=1;
   }
 
   // commit ME
-  if (!meCommitted && activeCount === 4) {
-    meCommitted = true;
-  }
+  if(!meCommitted && activeCount===5) meCommitted=true;
 
-  // PAUSE motion
-  if (clock >= 5 && clock < 7) {
-    const alpha = (clock - 5) / 2;
-    Object.entries(videos).forEach(([k, v]) => {
-      if (v.style.display === "none") return;
-      const a = startPos[k];
-      const b = facePos[k];
-      setPosition(v, {
-        x: a.x + (b.x - a.x) * alpha,
-        y: a.y + (b.y - a.y) * alpha
-      });
+  // motion during PAUSE
+  if(clock>=5 && clock<7){
+    const alpha=(clock-5)/2;
+    Object.entries(items).forEach(([k,v])=>{
+      if(v.style.display==="none") return;
+      const a=startPos[k], b=facePos[k];
+      setPosition(v,{x:a.x+(b.x-a.x)*alpha, y:a.y+(b.y-a.y)*alpha});
     });
   }
 
   // lock ME
-  if (clock >= 7) {
-    Object.entries(videos).forEach(([k, v]) => {
-      if (v.style.display === "none") return;
+  if(clock>=7){
+    Object.entries(items).forEach(([k,v])=>{
+      if(v.style.display==="none") return;
       setPosition(v, facePos[k]);
     });
   }
 
-  // END → RESET
-  if (meCommitted && clock >= 12) {
-    clock = 0;
-    meCommitted = false;
-    pressed.clear();
-    Object.values(videos).forEach(v => {
-      v.pause();
-      v.style.display = "none";
+  // update video time to match clock
+  Object.entries(items).forEach(([k,v])=>{
+    if(v.tagName==="VIDEO" && v.style.display!=="none"){
+      if(!meCommitted && activeCount<5){
+        // loop YOU 1-5
+        v.currentTime=Math.min(Math.max(clock,1),5);
+      } else {
+        // PAUSE+ME
+        v.currentTime=Math.min(clock,12);
+      }
+    }
+  });
+
+  // END RESET
+  if(meCommitted && clock>=12){
+    clock=0; meCommitted=false; pressed.clear();
+    Object.values(items).forEach(v=>{
+      v.style.display="none";
     });
   }
 
