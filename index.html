@@ -2,69 +2,78 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Vocalsynth V.5.1</title>
+<title>Vocalsynth V.5.2</title>
 
 <style>
-body {
-  margin: 0;
-  background: black;
-  overflow: hidden;
-}
+  body {
+    background: black;
+    margin: 0;
+    overflow: hidden;
+  }
 
-/* middle screen */
-#stage {
-  position: absolute;
-  top: 2cm;
-  bottom: 2cm;
-  left: 33vw;
-  width: 34vw;
-  border: 2px solid #444;
-}
+  #stage {
+    position: absolute;
+    top: 2cm;
+    bottom: 2cm;
+    left: 33vw;
+    width: 34vw;
+    border: 2px solid #444;
+  }
 
-/* videos */
-.video {
-  position: absolute;
-  width: 160px;
-  height: 160px;
-  object-fit: cover;
-  display: none;
-  transition: left 2s linear, top 2s linear, clip-path 2s linear;
-}
-
-/* scattered YOU positions */
-#v_z { left: 10%; top: 10%; }
-#v_c { left: 60%; top: 10%; }
-#v_b { left: 35%; top: 35%; }
-#v_m { left: 10%; top: 60%; }
-#v_dot { left: 60%; top: 60%; }
-
-/* face ME positions */
-.face-z { left: 38%; top: 30%; clip-path: inset(20% 20% 20% 20%); }   /* eye */
-.face-c { left: 48%; top: 30%; clip-path: inset(20% 20% 20% 20%); }   /* eye */
-.face-b { left: 43%; top: 45%; clip-path: inset(30% 30% 30% 30%); }   /* nose */
-.face-m { left: 38%; top: 60%; clip-path: inset(40% 10% 10% 10%); }   /* mouth */
-.face-dot { left: 48%; top: 60%; clip-path: inset(40% 10% 10% 10%); } /* mouth */
+  video {
+    position: absolute;
+    width: 180px;   /* bigger than squares */
+    height: 180px;
+    object-fit: cover;
+    display: none;
+    transition: none;
+  }
 </style>
 </head>
 
 <body>
 
 <div id="stage">
-  <video id="v_z" class="video" src="vocalsynth_ethan.mp4"></video>
-  <video id="v_c" class="video" src="vocalsynth_bryan.mp4"></video>
-  <video id="v_b" class="video" src="vocalsynth_dad.mp4"></video>
-  <video id="v_m" class="video" src="vocalsynth_monsang.mp4"></video>
-  <video id="v_dot" class="video" src="vocalsynth_mom.mp4"></video>
+  <video id="z" src="vocalsynth_ethan.mp4"></video>
+  <video id="c" src="vocalsynth_bryan.mp4"></video>
+  <video id="b" src="vocalsynth_dad.mp4"></video>
+  <video id="m" src="vocalsynth_monsang.mp4"></video>
+  <video id="dot" src="vocalsynth_mom.mp4"></video>
 </div>
 
 <script>
+/* ---------------- SETUP ---------------- */
+
 const videos = {
-  z: document.getElementById("v_z"),
-  c: document.getElementById("v_c"),
-  b: document.getElementById("v_b"),
-  m: document.getElementById("v_m"),
-  ".": document.getElementById("v_dot")
+  z: document.getElementById("z"),
+  c: document.getElementById("c"),
+  b: document.getElementById("b"),
+  m: document.getElementById("m"),
+  ".": document.getElementById("dot")
 };
+
+const startPos = {
+  z: { x: 65, y: 10 },
+  c: { x: 10, y: 10 },
+  b: { x: 65, y: 65 },
+  m: { x: 10, y: 65 },
+  ".": { x: 37, y: 37 }
+};
+
+const mergePos = {
+  z: { x: 30, y: 25 },
+  c: { x: 45, y: 25 },
+  b: { x: 37, y: 40 },
+  m: { x: 30, y: 55 },
+  ".": { x: 45, y: 55 }
+};
+
+function setPos(el, pos) {
+  el.style.left = pos.x + "%";
+  el.style.top = pos.y + "%";
+}
+
+/* ---------------- TIMING ---------------- */
 
 const pressed = new Set();
 let clock = 0;
@@ -74,64 +83,84 @@ let lastTime = performance.now();
 /* ---------------- INPUT ---------------- */
 
 document.addEventListener("keydown", e => {
-  const k = e.key.toLowerCase();
-  if (!videos[k] || pressed.has(k)) return;
+  const key = e.key.toLowerCase();
+  const v = videos[key];
+  if (!v || pressed.has(key)) return;
 
-  pressed.add(k);
-  const v = videos[k];
+  pressed.add(key);
 
   v.style.display = "block";
+  setPos(v, startPos[key]);
+
   v.currentTime = 0;
   v.muted = false;
   v.play();
 
-  if (pressed.size === 1 && !meCommitted) clock = 0;
-});
-
-document.addEventListener("keyup", e => {
-  const k = e.key.toLowerCase();
-  if (!videos[k]) return;
-
-  pressed.delete(k);
-
-  if (!meCommitted) {
-    videos[k].pause();
-    videos[k].style.display = "none";
+  if (pressed.size === 1 && !meCommitted) {
+    clock = 0;
   }
 });
 
-/* ---------------- TIMING ---------------- */
+document.addEventListener("keyup", e => {
+  const key = e.key.toLowerCase();
+  const v = videos[key];
+  if (!v) return;
+
+  pressed.delete(key);
+
+  if (!meCommitted) {
+    v.pause();
+    v.style.display = "none";
+  }
+});
+
+/* ---------------- ANIMATION LOOP ---------------- */
 
 function update(now) {
   const dt = (now - lastTime) / 1000;
   lastTime = now;
 
-  if (pressed.size > 0 || meCommitted) clock += dt;
+  const activeCount = pressed.size;
+
+  if (activeCount > 0 || meCommitted) {
+    clock += dt;
+  }
 
   // commit ME
-  if (!meCommitted && pressed.size === 5) {
+  if (!meCommitted && activeCount === 5) {
     meCommitted = true;
   }
 
-  // move + crop during PAUSE
-  if (clock >= 5 && clock < 7 && meCommitted) {
-    videos.z.classList.add("face-z");
-    videos.c.classList.add("face-c");
-    videos.b.classList.add("face-b");
-    videos.m.classList.add("face-m");
-    videos["."].classList.add("face-dot");
-  }
-
-  // reset after ME
+  // reset after ME ends
   if (meCommitted && clock >= 12) {
     clock = 0;
     meCommitted = false;
     pressed.clear();
-
     Object.values(videos).forEach(v => {
       v.pause();
       v.style.display = "none";
-      v.className = "video";
+    });
+  }
+
+  // motion during PAUSE (5–7)
+  if (clock >= 5 && clock < 7) {
+    const a = (clock - 5) / 2;
+    Object.entries(videos).forEach(([k, v]) => {
+      if (v.style.display === "none") return;
+      const s = startPos[k];
+      const m = mergePos[k];
+      setPos(v, {
+        x: s.x + (m.x - s.x) * a,
+        y: s.y + (m.y - s.y) * a
+      });
+    });
+  }
+
+  // lock merged
+  if (clock >= 7) {
+    Object.entries(videos).forEach(([k, v]) => {
+      if (v.style.display === "none") return;
+      setPos(v, mergePos[k]);
     });
   }
 
