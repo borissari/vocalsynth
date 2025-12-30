@@ -1,163 +1,137 @@
-let vids = {};
-let keysDown = {};
-let allPressed = false;
-let prevAllPressed = false;
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>VocalSynth V.4.1</title>
 
-let crops = {}; // random crop regions
+<style>
+  body {
+    margin: 0;
+    background: black;
+    overflow: hidden;
+  }
 
-let screenX, screenY, screenW, screenH;
+  /* central screen area */
+  #screen {
+    position: absolute;
+    left: 33vw;
+    width: 34vw;
+    top: 2cm;
+    bottom: 2cm;
+    border: 2px solid #333;
+  }
 
-const FACE_PARTS = {
-  z: { x: -80, y: -50 },  // eye
-  b: { x: 20,  y: -50 },  // eye
-  m: { x: -20, y: 0 },    // nose
-  '.': { x: -40, y: 60 }, // mouth
-  c: { x: 0,   y: 0 }     // ears placeholder
+  .vid, .square {
+    position: absolute;
+    width: 30%;
+    height: 30%;
+    display: none;
+    object-fit: cover;
+    transition: all 1s ease;
+  }
+
+  /* normal spread positions */
+  #z { top: 0; left: 0; }
+  #c { top: 0; right: 0; }
+  #b { bottom: 0; left: 0; }
+  #m { bottom: 0; right: 0; }
+  #dot { top: 35%; left: 35%; }
+
+  /* FACE POSITIONS */
+  .face-z { top: 10%; left: 20%; width: 25%; height: 20%; object-position: center 20%; }
+  .face-c { top: 10%; right: 20%; width: 25%; height: 20%; }
+  .face-b { top: 35%; left: 37%; width: 25%; height: 25%; object-position: center 50%; }
+  .face-m { bottom: 15%; left: 35%; width: 30%; height: 20%; object-position: center 80%; }
+  .face-dot { top: 30%; right: 5%; width: 20%; height: 40%; object-position: 80% center; }
+
+  .square {
+    background: #444;
+    color: white;
+    font-size: 24px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+</style>
+</head>
+
+<body>
+
+<div id="screen">
+
+  <video id="z" class="vid" src="vocalsynth_ethan.mp4" muted playsinline></video>
+  <div id="c" class="square">C</div>
+  <video id="b" class="vid" src="vocalsynth_dad.mp4" muted playsinline></video>
+  <video id="m" class="vid" src="vocalsynth_monsang.mp4" muted playsinline></video>
+  <video id="dot" class="vid" src="vocalsynth_mom.mp4" muted playsinline></video>
+
+</div>
+
+<script>
+const keys = {
+  z: document.getElementById("z"),
+  c: document.getElementById("c"),
+  b: document.getElementById("b"),
+  m: document.getElementById("m"),
+  ".": document.getElementById("dot")
 };
 
-function preload() {
-  vids.z = createVideo('vocalsynth_ethan.mp4');
-  vids.b = createVideo('vocalsynth_dad.mp4');
-  vids.m = createVideo('vocalsynth_monsang.mp4');
-  vids['.'] = createVideo('vocalsynth_mom.mp4');
-}
+let pressed = new Set();
+let faceMode = false;
 
-function setup() {
-  createCanvas(windowWidth, windowHeight);
+document.addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+  if (!keys[k]) return;
+  if (pressed.has(k)) return;
 
-  screenW = width * 0.33;
-  screenH = height - 40;
-  screenX = width / 2 - screenW / 2;
-  screenY = 20;
+  pressed.add(k);
+  const el = keys[k];
 
-  for (let k in vids) {
-    vids[k].hide();
-    vids[k].loop();
-    vids[k].volume(0);
+  el.style.display = "flex";
+
+  if (el.tagName === "VIDEO") {
+    el.currentTime = 0;
+    el.muted = false;
+    el.play();
   }
-}
 
-function draw() {
-  background(15);
+  checkAllPressed();
+});
 
-  // screen frame
-  noFill();
-  stroke(80);
-  rect(screenX, screenY, screenW, screenH);
+document.addEventListener("keyup", e => {
+  const k = e.key.toLowerCase();
+  if (!keys[k]) return;
 
-  allPressed =
-    keysDown['z'] &&
-    keysDown['b'] &&
-    keysDown['m'] &&
-    keysDown['.'] &&
-    keysDown['c'];
+  pressed.delete(k);
 
-  // detect transition → generate random crops ONCE
-  if (allPressed && !prevAllPressed) {
-    generateRandomCrops();
-  }
-  prevAllPressed = allPressed;
-
-  if (!allPressed) {
-    drawSpread();
-  } else {
-    drawFace();
-  }
-}
-
-/* ---------------- SPREAD ---------------- */
-
-function drawSpread() {
-  let spacing = screenW / 5;
-  let i = 0;
-
-  for (let k of ['z', 'b', 'm', '.', 'c']) {
-    let x = screenX + spacing * i + spacing / 2;
-    let y = screenY + screenH / 2;
-
-    if (vids[k]) {
-      image(vids[k], x - 80, y - 60, 160, 120);
-    } else {
-      fill(70);
-      rect(x - 60, y - 60, 120, 120);
-      fill(255);
-      textAlign(CENTER, CENTER);
-      text('C', x, y);
+  if (!faceMode) {
+    const el = keys[k];
+    if (el.tagName === "VIDEO") {
+      el.pause();
+      el.currentTime = 0;
     }
+    el.style.display = "none";
+  }
+});
 
-    i++;
+function checkAllPressed() {
+  if (pressed.size === 5 && !faceMode) {
+    faceMode = true;
+
+    setTimeout(() => {
+      keys.z.classList.add("face-z");
+      keys.c.classList.add("face-c");
+      keys.b.classList.add("face-b");
+      keys.m.classList.add("face-m");
+      keys["."].classList.add("face-dot");
+
+      Object.values(keys).forEach(el => {
+        if (el.tagName === "VIDEO") el.play();
+      });
+    }, 300);
   }
 }
+</script>
 
-/* ---------------- FACE ---------------- */
-
-function drawFace() {
-  let cx = screenX + screenW / 2;
-  let cy = screenY + screenH / 2;
-
-  for (let k in FACE_PARTS) {
-    if (vids[k]) {
-      let part = FACE_PARTS[k];
-      let crop = crops[k];
-
-      drawCropped(
-        vids[k],
-        cx + part.x,
-        cy + part.y,
-        80,
-        60,
-        crop
-      );
-    }
-  }
-
-  // ears placeholder
-  fill(90);
-  ellipse(cx - 130, cy - 10, 40, 60);
-  ellipse(cx + 130, cy - 10, 40, 60);
-}
-
-/* ---------------- CROPPING ---------------- */
-
-function drawCropped(vid, x, y, w, h, crop) {
-  image(
-    vid,
-    x,
-    y,
-    w,
-    h,
-    crop.sx,
-    crop.sy,
-    crop.sw,
-    crop.sh
-  );
-}
-
-/* ---------------- RANDOM CROP ---------------- */
-
-function generateRandomCrops() {
-  for (let k in vids) {
-    let vw = vids[k].width;
-    let vh = vids[k].height;
-
-    let sw = vw * 0.35;
-    let sh = vh * 0.35;
-
-    let sx = random(0, vw - sw);
-    let sy = random(0, vh - sh);
-
-    crops[k] = { sx, sy, sw, sh };
-  }
-}
-
-/* ---------------- INPUT ---------------- */
-
-function keyPressed() {
-  keysDown[key] = true;
-  if (vids[key]) vids[key].volume(1);
-}
-
-function keyReleased() {
-  keysDown[key] = false;
-  if (vids[key]) vids[key].volume(0);
-}
+</body>
+</html>
