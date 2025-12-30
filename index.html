@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Vocalsynth V.5.2</title>
+<title>Vocalsynth V.5.3</title>
 
 <style>
   body {
     background: black;
     margin: 0;
     overflow: hidden;
+    font-family: monospace;
   }
 
   #stage {
@@ -18,15 +19,23 @@
     left: 33vw;
     width: 34vw;
     border: 2px solid #444;
+    overflow: hidden;
   }
 
   video {
     position: absolute;
-    width: 180px;   /* bigger than squares */
-    height: 180px;
-    object-fit: cover;
     display: none;
+    object-fit: contain;
     transition: none;
+    pointer-events: none;
+  }
+
+  #sound {
+    position: fixed;
+    right: 20px;
+    top: 20px;
+    color: red;
+    font-size: 16px;
   }
 </style>
 </head>
@@ -41,8 +50,12 @@
   <video id="dot" src="vocalsynth_mom.mp4"></video>
 </div>
 
+<div id="sound">🔇 SOUND OFF</div>
+
 <script>
 /* ---------------- SETUP ---------------- */
+
+const stage = document.getElementById("stage");
 
 const videos = {
   z: document.getElementById("z"),
@@ -52,25 +65,22 @@ const videos = {
   ".": document.getElementById("dot")
 };
 
+// YOU positions (scattered)
 const startPos = {
-  z: { x: 65, y: 10 },
-  c: { x: 10, y: 10 },
+  z: { x: 65, y: 15 },
+  c: { x: 15, y: 15 },
   b: { x: 65, y: 65 },
-  m: { x: 10, y: 65 },
-  ".": { x: 37, y: 37 }
+  m: { x: 15, y: 65 },
+  ".": { x: 40, y: 40 }
 };
 
-const mergePos = {
-  z: { x: 30, y: 25 },
-  c: { x: 45, y: 25 },
-  b: { x: 37, y: 40 },
-  m: { x: 30, y: 55 },
-  ".": { x: 45, y: 55 }
-};
+// ME position (all overlap here)
+const centerPos = { x: 50, y: 50 };
 
-function setPos(el, pos) {
+function setPosition(el, pos) {
   el.style.left = pos.x + "%";
   el.style.top = pos.y + "%";
+  el.style.transform = "translate(-50%, -50%)";
 }
 
 /* ---------------- TIMING ---------------- */
@@ -90,7 +100,9 @@ document.addEventListener("keydown", e => {
   pressed.add(key);
 
   v.style.display = "block";
-  setPos(v, startPos[key]);
+  setPosition(v, startPos[key]);
+  v.style.height = "30%";
+  v.style.width = "auto";
 
   v.currentTime = 0;
   v.muted = false;
@@ -131,7 +143,7 @@ function update(now) {
     meCommitted = true;
   }
 
-  // reset after ME ends
+  // reset
   if (meCommitted && clock >= 12) {
     clock = 0;
     meCommitted = false;
@@ -142,27 +154,32 @@ function update(now) {
     });
   }
 
-  // motion during PAUSE (5–7)
+  // PAUSE → move toward center
   if (clock >= 5 && clock < 7) {
-    const a = (clock - 5) / 2;
+    const alpha = (clock - 5) / 2;
+
     Object.entries(videos).forEach(([k, v]) => {
       if (v.style.display === "none") return;
-      const s = startPos[k];
-      const m = mergePos[k];
-      setPos(v, {
-        x: s.x + (m.x - s.x) * a,
-        y: s.y + (m.y - s.y) * a
+      const a = startPos[k];
+      setPosition(v, {
+        x: a.x + (50 - a.x) * alpha,
+        y: a.y + (50 - a.y) * alpha
       });
     });
   }
 
-  // lock merged
+  // ME → overlap & fill height
   if (clock >= 7) {
-    Object.entries(videos).forEach(([k, v]) => {
+    Object.values(videos).forEach(v => {
       if (v.style.display === "none") return;
-      setPos(v, mergePos[k]);
+      setPosition(v, centerPos);
+      v.style.height = "100%";
+      v.style.width = "auto";
     });
   }
+
+  document.getElementById("sound").textContent =
+    (activeCount > 0 || meCommitted) ? "🔊 SOUND ON" : "🔇 SOUND OFF";
 
   requestAnimationFrame(update);
 }
@@ -172,3 +189,4 @@ requestAnimationFrame(update);
 
 </body>
 </html>
+
