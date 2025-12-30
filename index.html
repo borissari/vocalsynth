@@ -1,429 +1,150 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vocalsynth</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            overflow: hidden;
-            background: #000;
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        
-        /* Stage container - middle 1/3 of screen, centered */
-        #stage {
-            position: relative;
-            width: 33.333vw;
-            height: 100vh;
-            background: #111;
-            overflow: hidden;
-        }
-        
-        /* Video elements */
-        video {
-            position: absolute;
-            object-fit: cover;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-        
-        video.active {
-            opacity: 1;
-        }
-        
-        /* Debug info */
-        #info {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            color: #fff;
-            font-size: 14px;
-            background: rgba(0,0,0,0.7);
-            padding: 15px;
-            border-radius: 5px;
-            font-family: monospace;
-            line-height: 1.6;
-        }
-        
-        .pressed {
-            color: #0f0;
-        }
-    </style>
+<meta charset="UTF-8">
+<title>Vocalsynth vv11</title>
+<style>
+  body {
+    margin: 0;
+    background: black;
+    overflow: hidden;
+    font-family: monospace;
+  }
+  #stage {
+    position: absolute;
+    top: 0;
+    left: 33.333vw;
+    width: 33.333vw;
+    height: 100vh;
+    overflow: hidden;
+    background: #111;
+  }
+  video {
+    position: absolute;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.2s;
+    transform-origin: top left;
+  }
+  video.active {
+    opacity: 1;
+  }
+</style>
 </head>
 <body>
-    <div id="stage"></div>
-    <div id="info">
-        <div>Phase: <span id="phase">YOU</span></div>
-        <div>Keys held: <span id="keys">0/5</span></div>
-        <div>ME committed: <span id="committed">NO</span></div>
-        <div>Animation running: <span id="anim-running">NO</span></div>
-        <div style="margin-top: 10px;">
-            Z: <span id="key-z">- (0.00s)</span><br>
-            C: <span id="key-c">- (0.00s)</span><br>
-            B: <span id="key-b">- (0.00s)</span><br>
-            M: <span id="key-m">- (0.00s)</span><br>
-            .: <span id="key-period">- (0.00s)</span>
-        </div>
-        <div style="margin-top: 10px; font-size: 12px; color: #888;">
-            <div id="debug-log"></div>
-        </div>
-    </div>
+<div id="stage"></div>
 
-    <script>
-        // ==================== CONFIGURATION ====================
-        const VIDEO_MAPPING = {
-            'z': 'vocalsynth_ethan.mp4',
-            'c': 'vocalsynth_bryan.mp4',
-            'b': 'vocalsynth_dad.mp4',
-            'm': 'vocalsynth_monsang.mp4',
-            '.': 'vocalsynth_mom.mp4'
-        };
-        
-        // Scattered positions for YOU phase (percentages)
-        const SCATTERED_POS = {
-            'z': { x: 10, y: 10, width: 35, height: 35 },
-            'c': { x: 55, y: 10, width: 35, height: 35 },
-            'b': { x: 10, y: 55, width: 35, height: 35 },
-            'm': { x: 55, y: 55, width: 35, height: 35 },
-            '.': { x: 32.5, y: 32.5, width: 35, height: 35 }
-        };
-        
-        // Final face positions for ME phase (percentages)
-        const FACE_POS = {
-            'z': { x: 15, y: 20, width: 30, height: 30 },  // left eye
-            'c': { x: 55, y: 20, width: 30, height: 30 },  // right eye
-            'b': { x: 35, y: 40, width: 30, height: 30 },  // nose (center)
-            'm': { x: 20, y: 60, width: 25, height: 25 },  // left mouth
-            '.': { x: 55, y: 60, width: 25, height: 25 }   // right mouth
-        };
-        
-        // ==================== STATE ====================
-        const state = {
-            keysDown: new Set(),        // Currently held down keys
-            videoElements: {},          // Video DOM elements
-            meCommitted: false,         // Whether ME phase has been committed
-            pauseStartTimes: {},        // Video times when PAUSE started (for sync)
-            pausePhaseStarted: false,   // Whether we've entered PAUSE phase
-            mePhaseStarted: false,      // Whether we've entered ME phase
-            pauseAnimStart: null,       // When PAUSE animation started
-            animationFrame: null,       // RAF handle
-            debugLog: []                // Debug messages
-        };
-        
-        function log(msg) {
-            console.log(msg);
-            state.debugLog.push(msg);
-            if (state.debugLog.length > 5) state.debugLog.shift();
-            const debugEl = document.getElementById('debug-log');
-            if (debugEl) debugEl.innerHTML = state.debugLog.join('<br>');
-        }
-        
-        // ==================== INITIALIZATION ====================
-        const stage = document.getElementById('stage');
-        
-        // Create video elements
-        for (const [key, filename] of Object.entries(VIDEO_MAPPING)) {
-            const video = document.createElement('video');
-            video.src = filename;
-            video.muted = true;
-            video.style.display = 'none';
-            video.preload = 'auto';
-            stage.appendChild(video);
-            state.videoElements[key] = video;
-            
-            // Add error handler
-            video.addEventListener('error', (e) => {
-                log(`ERROR loading ${key}: ${video.error ? video.error.message : 'unknown'}`);
-            });
-            
-            // Add loaded handler
-            video.addEventListener('loadeddata', () => {
-                log(`${key} loaded: ${video.duration.toFixed(2)}s`);
-            });
-            
-            // Monitor playback
-            video.addEventListener('play', () => {
-                log(`${key} started playing`);
-            });
-            
-            video.addEventListener('pause', () => {
-                log(`${key} paused`);
-            });
-        }
-        
-        // ==================== UTILITY FUNCTIONS ====================
-        
-        function getCurrentPhase() {
-            if (!state.meCommitted) return 'YOU';
-            if (!state.mePhaseStarted) return 'PAUSE';
-            return 'ME';
-        }
-        
-        // Apply position to video element
-        function applyPosition(key, pos) {
-            const video = state.videoElements[key];
-            video.style.left = `${pos.x}%`;
-            video.style.top = `${pos.y}%`;
-            video.style.width = `${pos.width}%`;
-            video.style.height = `${pos.height}%`;
-        }
-        
-        // Linear interpolation
-        function lerp(start, end, t) {
-            return start + (end - start) * t;
-        }
-        
-        // Ease in-out cubic
-        function easeInOutCubic(t) {
-            return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-        }
-        
-        // ==================== MAIN UPDATE LOOP ====================
-        
-        function update() {
-            // PAUSE PHASE: Sync all videos to play 5-7s portion
-            if (state.meCommitted && !state.pausePhaseStarted) {
-                state.pausePhaseStarted = true;
-                state.pauseAnimStart = performance.now();
-                
-                // Sync all videos to start at 5 seconds
-                for (const key of Object.keys(VIDEO_MAPPING)) {
-                    const video = state.videoElements[key];
-                    
-                    // Ensure video is playing first
-                    if (video.paused) {
-                        video.muted = false;
-                        video.play().then(() => {
-                            video.currentTime = 5;
-                        }).catch(error => {
-                            console.error(`Error playing video ${key} in PAUSE:`, error);
-                        });
-                    } else {
-                        video.currentTime = 5;
-                    }
-                    
-                    state.pauseStartTimes[key] = 5;
-                }
-            }
-            
-            // PAUSE PHASE: Animate from scattered to face positions (while videos play 5-7s)
-            if (state.pausePhaseStarted && !state.mePhaseStarted) {
-                const elapsed = (performance.now() - state.pauseAnimStart) / 1000;
-                const alpha = easeInOutCubic(Math.min(elapsed / 2, 1)); // 2 second animation
-                
-                // Animate positions
-                for (const key of Object.keys(VIDEO_MAPPING)) {
-                    const video = state.videoElements[key];
-                    if (video.style.display === 'none') continue;
-                    
-                    const start = SCATTERED_POS[key];
-                    const end = FACE_POS[key];
-                    
-                    const currentPos = {
-                        x: lerp(start.x, end.x, alpha),
-                        y: lerp(start.y, end.y, alpha),
-                        width: lerp(start.width, end.width, alpha),
-                        height: lerp(start.height, end.height, alpha)
-                    };
-                    
-                    applyPosition(key, currentPos);
-                }
-                
-                // Check if any video has reached 7 seconds (end of PAUSE)
-                let allReached7s = true;
-                for (const key of Object.keys(VIDEO_MAPPING)) {
-                    const video = state.videoElements[key];
-                    if (video.style.display !== 'none') {
-                        console.log(`Video ${key} time: ${video.currentTime.toFixed(2)}s`);
-                        if (video.currentTime < 6.9) { // Small buffer for timing
-                            allReached7s = false;
-                        }
-                    }
-                }
-                
-                if (allReached7s) {
-                    console.log('All videos reached 7s, entering ME phase');
-                    state.mePhaseStarted = true;
-                    // Lock positions to face
-                    for (const key of Object.keys(VIDEO_MAPPING)) {
-                        const video = state.videoElements[key];
-                        if (video.style.display === 'none') continue;
-                        applyPosition(key, FACE_POS[key]);
-                    }
-                }
-            }
-            
-            // ME PHASE: Videos continue playing from 7s to end
-            if (state.mePhaseStarted) {
-                // Check if all videos have ended
-                let allEnded = true;
-                for (const key of Object.keys(VIDEO_MAPPING)) {
-                    const video = state.videoElements[key];
-                    if (video.style.display !== 'none' && !video.ended) {
-                        allEnded = false;
-                        break;
-                    }
-                }
-                
-                if (allEnded) {
-                    reset();
-                    return;
-                }
-            }
-            
-            updateDebugInfo();
-            state.animationFrame = requestAnimationFrame(update);
-        }
-        
-        // ==================== RESET ====================
-        
-        function resetAllVideos() {
-            // Stop and hide all videos
-            for (const key of Object.keys(VIDEO_MAPPING)) {
-                const video = state.videoElements[key];
-                video.pause();
-                video.currentTime = 0;
-                video.muted = true;
-                video.classList.remove('active');
-                video.style.display = 'none';
-            }
-            
-            // Clear all keys down
-            state.keysDown.clear();
-            
-            updateDebugInfo();
-        }
-        
-        function reset() {
-            state.meCommitted = false;
-            state.pausePhaseStarted = false;
-            state.mePhaseStarted = false;
-            state.pauseAnimStart = null;
-            state.pauseStartTimes = {};
-            state.keysDown.clear();
-            
-            // Stop and hide all videos
-            for (const video of Object.values(state.videoElements)) {
-                video.pause();
-                video.currentTime = 0;
-                video.muted = true;
-                video.classList.remove('active');
-                video.style.display = 'none';
-            }
-            
-            updateDebugInfo();
-        }
-        
-        // ==================== KEY HANDLERS ====================
-        
-        document.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase();
-            
-            // Ignore if not a mapped key or already down
-            if (!VIDEO_MAPPING[key] || state.keysDown.has(key)) return;
-            
-            state.keysDown.add(key);
-            const video = state.videoElements[key];
-            
-            // Only respond in YOU phase
-            if (!state.meCommitted) {
-                log(`Key ${key} pressed, starting video`);
-                
-                // Show video at scattered position
-                applyPosition(key, SCATTERED_POS[key]);
-                video.style.display = 'block';
-                video.classList.add('active');
-                video.currentTime = 0;
-                video.muted = false;
-                
-                // Use play() with promise handling
-                const playPromise = video.play();
-                if (playPromise !== undefined) {
-                    playPromise
-                        .then(() => {
-                            log(`${key} playing successfully`);
-                        })
-                        .catch(error => {
-                            log(`ERROR playing ${key}: ${error.message}`);
-                        });
-                }
-                
-                // Start animation loop if not running
-                if (!state.animationFrame) {
-                    log('Starting animation loop');
-                    state.animationFrame = requestAnimationFrame(update);
-                }
-                
-                // Check if all 5 keys are now held
-                if (state.keysDown.size === 5) {
-                    log('All 5 keys held! Committing ME');
-                    state.meCommitted = true;
-                }
-            }
-            
-            updateDebugInfo();
-        });
-        
-        document.addEventListener('keyup', (e) => {
-            const key = e.key.toLowerCase();
-            
-            if (!VIDEO_MAPPING[key]) return;
-            
-            state.keysDown.delete(key);
-            const video = state.videoElements[key];
-            
-            // Only hide/stop video if ME is not committed
-            if (!state.meCommitted) {
-                video.pause();
-                video.currentTime = 0;
-                video.muted = true;
-                video.classList.remove('active');
-                video.style.display = 'none';
-                
-                // If any key released before ME committed, reset all
-                resetAllVideos();
-            }
-            // If ME is committed, videos continue playing
-            
-            updateDebugInfo();
-        });
-        
-        // ==================== DEBUG INFO ====================
-        
-        function updateDebugInfo() {
-            document.getElementById('phase').textContent = getCurrentPhase();
-            document.getElementById('keys').textContent = `${state.keysDown.size}/5`;
-            document.getElementById('committed').textContent = state.meCommitted ? 'YES' : 'NO';
-            document.getElementById('anim-running').textContent = state.animationFrame ? 'YES' : 'NO';
-            
-            // Update individual key status with video time
-            for (const key of Object.keys(VIDEO_MAPPING)) {
-                const elemId = `key-${key === '.' ? 'period' : key}`;
-                const elem = document.getElementById(elemId);
-                const video = state.videoElements[key];
-                
-                if (state.keysDown.has(key) || video.style.display === 'block') {
-                    const time = video.currentTime.toFixed(2);
-                    const paused = video.paused ? ' [PAUSED]' : '';
-                    elem.textContent = state.keysDown.has(key) ? `HELD (${time}s${paused})` : `playing (${time}s${paused})`;
-                    elem.className = state.keysDown.has(key) ? 'pressed' : '';
-                } else {
-                    elem.textContent = '- (0.00s)';
-                    elem.className = '';
-                }
-            }
-        }
-    </script>
+<script>
+const VIDEO_MAPPING = {
+  'z': 'vocalsynth_ethan.mp4',
+  'c': 'vocalsynth_bryan.mp4',
+  'b': 'vocalsynth_dad.mp4',
+  'm': 'vocalsynth_monsang.mp4',
+  '.': 'vocalsynth_mom.mp4'
+};
+
+// Initial scattered positions (%)
+const SCATTERED_POS = {
+  'z': { x: 5, y: 5, width: 40, height: 40 },
+  'c': { x: 55, y: 5, width: 40, height: 40 },
+  'b': { x: 5, y: 55, width: 40, height: 40 },
+  'm': { x: 55, y: 55, width: 40, height: 40 },
+  '.': { x: 32.5, y: 32.5, width: 40, height: 40 }
+};
+
+// ME positions and crop (top-left, top-right, bottom-left, bottom-right, center)
+const FACE_POS = {
+  'z': { x: 0, y: 0, width: 50, height: 50, clip: 'rect(0px,50%,50%,0px)' },       // top-left
+  'c': { x: '50%', y: 0, width: 50, height: 50, clip: 'rect(0px,100%,50%,50%)' },  // top-right
+  'b': { x: 25, y: 25, width: 50, height: 50, clip: 'rect(25%,75%,75%,25%)' },     // center
+  'm': { x: 0, y: '50%', width: 50, height: 50, clip: 'rect(50%,50%,100%,0%)' },   // bottom-left
+  '.': { x: '50%', y: '50%', width: 50, height: 50, clip: 'rect(50%,100%,100%,50%)' } // bottom-right
+};
+
+const stage = document.getElementById('stage');
+const state = {
+  keysDown: new Set(),
+  videos: {},
+  meCommitted: false,
+  pauseStart: null,
+  meStarted: false
+};
+
+// Create video elements
+for(const [key, src] of Object.entries(VIDEO_MAPPING)){
+  const v = document.createElement('video');
+  v.src = src;
+  v.muted = false;
+  v.style.display = 'none';
+  v.preload = 'auto';
+  stage.appendChild(v);
+  state.videos[key] = v;
+}
+
+// Utility functions
+function lerp(a, b, t){ return a + (b-a)*t; }
+function applyPos(video,pos){
+  video.style.left = typeof pos.x==='number'? pos.x+'%':pos.x;
+  video.style.top = typeof pos.y==='number'? pos.y+'%':pos.y;
+  video.style.width = pos.width+'%';
+  video.style.height = pos.height+'%';
+  if(pos.clip) video.style.clip = pos.clip;
+}
+
+// Key handling
+document.addEventListener('keydown', e=>{
+  const k = e.key.toLowerCase();
+  if(!VIDEO_MAPPING[k] || state.keysDown.has(k)) return;
+  state.keysDown.add(k);
+  const v = state.videos[k];
+  v.style.display='block';
+  v.classList.add('active');
+  applyPos(v, SCATTERED_POS[k]);
+  v.currentTime = 0;
+  v.play();
+  if(state.keysDown.size===5 && !state.meCommitted){
+    state.meCommitted=true;
+    state.pauseStart = performance.now();
+  }
+});
+
+document.addEventListener('keyup', e=>{
+  const k = e.key.toLowerCase();
+  if(!VIDEO_MAPPING[k]) return;
+  state.keysDown.delete(k);
+  if(!state.meCommitted){
+    const v = state.videos[k];
+    v.pause();
+    v.style.display='none';
+    v.classList.remove('active');
+  }
+});
+
+// Animation loop
+function update(){
+  const now = performance.now();
+  // PAUSE animation
+  if(state.meCommitted && !state.meStarted){
+    const elapsed = (now - state.pauseStart)/1000;
+    const t = Math.min(elapsed/2,1); // 2 seconds
+    for(const [k,v] of Object.entries(state.videos)){
+      if(v.style.display==='none') continue;
+      const s = SCATTERED_POS[k];
+      const f = FACE_POS[k];
+      const pos = {
+        x: lerp(s.x, f.x, t),
+        y: lerp(s.y, f.y, t),
+        width: lerp(s.width, f.width, t),
+        height: lerp(s.height, f.height, t),
+        clip: f.clip
+      };
+      applyPos(v,pos);
+    }
+    if(t===1) state.meStarted=true;
+  }
+  requestAnimationFrame(update);
+}
+requestAnimationFrame(update);
+</script>
 </body>
 </html>
