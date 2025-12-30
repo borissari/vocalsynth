@@ -2,15 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Vocalsynth – V.4.3</title>
+<title>Vocalsynth V.5.1</title>
 
 <style>
 body {
-  background: black;
   margin: 0;
+  background: black;
   overflow: hidden;
 }
 
+/* middle screen */
 #stage {
   position: absolute;
   top: 2cm;
@@ -20,160 +21,117 @@ body {
   border: 2px solid #444;
 }
 
-/* video blocks */
-.clip {
+/* videos */
+.video {
   position: absolute;
   width: 160px;
   height: 160px;
-  display: none;
   object-fit: cover;
-  transition: none;
+  display: none;
+  transition: left 2s linear, top 2s linear, clip-path 2s linear;
 }
 
-/* starting scattered positions (YOU) */
-.start-z { left: 65%; top: 10%; }
-.start-c { left: 15%; top: 10%; }
-.start-b { left: 65%; top: 65%; }
-.start-m { left: 15%; top: 65%; }
-.start-dot { left: 40%; top: 40%; }
+/* scattered YOU positions */
+#v_z { left: 10%; top: 10%; }
+#v_c { left: 60%; top: 10%; }
+#v_b { left: 35%; top: 35%; }
+#v_m { left: 10%; top: 60%; }
+#v_dot { left: 60%; top: 60%; }
 
-/* face positions (ME) */
-.face-z { left: 35%; top: 25%; }   /* left eye */
-.face-c { left: 50%; top: 25%; }   /* right eye */
-.face-b { left: 42%; top: 40%; }   /* nose */
-.face-m { left: 35%; top: 55%; }   /* mouth */
-.face-dot { left: 50%; top: 55%; } /* mouth */
-
+/* face ME positions */
+.face-z { left: 38%; top: 30%; clip-path: inset(20% 20% 20% 20%); }   /* eye */
+.face-c { left: 48%; top: 30%; clip-path: inset(20% 20% 20% 20%); }   /* eye */
+.face-b { left: 43%; top: 45%; clip-path: inset(30% 30% 30% 30%); }   /* nose */
+.face-m { left: 38%; top: 60%; clip-path: inset(40% 10% 10% 10%); }   /* mouth */
+.face-dot { left: 48%; top: 60%; clip-path: inset(40% 10% 10% 10%); } /* mouth */
 </style>
 </head>
 
 <body>
 
 <div id="stage">
-
-  <video id="z" class="clip start-z"
-    src="vocalsynth_ethan.mp4" playsinline></video>
-
-  <!-- C is placeholder -->
-  <div id="c" class="clip start-c"
-    style="background:#333;color:white;font-family:monospace;
-           display:none;align-items:center;justify-content:center;">
-    C
-  </div>
-
-  <video id="b" class="clip start-b"
-    src="vocalsynth_dad.mp4" playsinline></video>
-
-  <video id="m" class="clip start-m"
-    src="vocalsynth_monsang.mp4" playsinline></video>
-
-  <video id="dot" class="clip start-dot"
-    src="vocalsynth_mom.mp4" playsinline></video>
-
+  <video id="v_z" class="video" src="vocalsynth_ethan.mp4"></video>
+  <video id="v_c" class="video" src="vocalsynth_bryan.mp4"></video>
+  <video id="v_b" class="video" src="vocalsynth_dad.mp4"></video>
+  <video id="v_m" class="video" src="vocalsynth_monsang.mp4"></video>
+  <video id="v_dot" class="video" src="vocalsynth_mom.mp4"></video>
 </div>
 
 <script>
-/* ---------------- SETUP ---------------- */
-
-const clips = {
-  z: document.getElementById("z"),
-  c: document.getElementById("c"),
-  b: document.getElementById("b"),
-  m: document.getElementById("m"),
-  ".": document.getElementById("dot")
+const videos = {
+  z: document.getElementById("v_z"),
+  c: document.getElementById("v_c"),
+  b: document.getElementById("v_b"),
+  m: document.getElementById("v_m"),
+  ".": document.getElementById("v_dot")
 };
 
 const pressed = new Set();
 let clock = 0;
-let committed = false;
+let meCommitted = false;
 let lastTime = performance.now();
 
 /* ---------------- INPUT ---------------- */
 
 document.addEventListener("keydown", e => {
-  const key = e.key.toLowerCase();
-  const el = clips[key];
-  if (!el || pressed.has(key)) return;
+  const k = e.key.toLowerCase();
+  if (!videos[k] || pressed.has(k)) return;
 
-  pressed.add(key);
-  el.style.display = "block";
+  pressed.add(k);
+  const v = videos[k];
 
-  if (el.tagName === "VIDEO") {
-    el.currentTime = 0;
-    el.play();
-  }
+  v.style.display = "block";
+  v.currentTime = 0;
+  v.muted = false;
+  v.play();
 
-  if (pressed.size === 1 && !committed) clock = 0;
+  if (pressed.size === 1 && !meCommitted) clock = 0;
 });
 
 document.addEventListener("keyup", e => {
-  const key = e.key.toLowerCase();
-  if (!clips[key]) return;
+  const k = e.key.toLowerCase();
+  if (!videos[k]) return;
 
-  pressed.delete(key);
+  pressed.delete(k);
 
-  if (!committed) {
-    const el = clips[key];
-    el.style.display = "none";
-    if (el.tagName === "VIDEO") el.pause();
+  if (!meCommitted) {
+    videos[k].pause();
+    videos[k].style.display = "none";
   }
 });
 
-/* ---------------- ANIMATION LOOP ---------------- */
+/* ---------------- TIMING ---------------- */
 
 function update(now) {
   const dt = (now - lastTime) / 1000;
   lastTime = now;
 
-  if (pressed.size > 0 || committed) clock += dt;
-
-  // YOU loop prevention (no looping, just cap)
-  if (!committed && clock > 5) clock = 5;
+  if (pressed.size > 0 || meCommitted) clock += dt;
 
   // commit ME
-  if (!committed && pressed.size === 5) {
-    committed = true;
+  if (!meCommitted && pressed.size === 5) {
+    meCommitted = true;
   }
 
-  // MOVE + CROP during PAUSE (5–7)
-  if (clock >= 5 && clock < 7) {
-    const a = (clock - 5) / 2;
-
-    Object.entries(clips).forEach(([k, el]) => {
-      if (el.style.display === "none") return;
-
-      el.style.transition = "left 0.1s linear, top 0.1s linear";
-      el.classList.remove("start-" + k);
-      el.classList.add("face-" + k);
-
-      // crop illusion
-      if (el.tagName === "VIDEO") {
-        el.style.objectPosition =
-          `${50 + (Math.random() * 20 - 10)}% ${50 + (Math.random() * 20 - 10)}%`;
-      }
-    });
+  // move + crop during PAUSE
+  if (clock >= 5 && clock < 7 && meCommitted) {
+    videos.z.classList.add("face-z");
+    videos.c.classList.add("face-c");
+    videos.b.classList.add("face-b");
+    videos.m.classList.add("face-m");
+    videos["."].classList.add("face-dot");
   }
 
-  // lock ME
-  if (clock >= 7) {
-    Object.entries(clips).forEach(([k, el]) => {
-      el.classList.remove("start-" + k);
-      el.classList.add("face-" + k);
-    });
-  }
-
-  // RESET after ME ends
-  if (committed && clock >= 12) {
+  // reset after ME
+  if (meCommitted && clock >= 12) {
     clock = 0;
-    committed = false;
+    meCommitted = false;
     pressed.clear();
 
-    Object.values(clips).forEach(el => {
-      el.style.display = "none";
-      if (el.tagName === "VIDEO") {
-        el.pause();
-        el.currentTime = 0;
-      }
+    Object.values(videos).forEach(v => {
+      v.pause();
+      v.style.display = "none";
+      v.className = "video";
     });
   }
 
