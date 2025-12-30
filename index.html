@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>V.7.1 Vocalsynth</title>
+<title>V.7.2 Vocalsynth</title>
 <style>
   body {
     margin: 0;
@@ -29,22 +29,25 @@ const VIDEO_MAPPING = {
   '.': 'vs_mom.mp4'
 };
 
-// Start positions inside middle 1/3 horizontally
+// Shift everything slightly left (~2% of screen)
+const LEFT_SHIFT = '-2%';
+
+// Start positions inside middle 1/3 horizontally, slightly left
 const START_POS = {
-  z: { left: '35%', top: '10%', width: '10%', height: '30%' },
-  c: { left: '55%', top: '10%', width: '10%', height: '30%' },
-  b: { left: '35%', top: '55%', width: '10%', height: '30%' },
-  m: { left: '55%', top: '55%', width: '10%', height: '30%' },
-  '.': { left: '45%', top: '35%', width: '10%', height: '30%' }
+  z: { left: `33%`, top: '10%', width: '10%', height: '30%' },
+  c: { left: `53%`, top: '10%', width: '10%', height: '30%' },
+  b: { left: `33%`, top: '55%', width: '10%', height: '30%' },
+  m: { left: `53%`, top: '55%', width: '10%', height: '30%' },
+  '.': { left: `43%`, top: '35%', width: '10%', height: '30%' }
 };
 
-// ME phase positions, full height, overlapping
+// ME phase positions, full height, overlapping, slightly left
 const ME_POS = {
-  z: { left: '0%', top: '0%', width: '100%', height: '100%', opacity: 0.6 },
-  c: { left: '0%', top: '0%', width: '100%', height: '100%', opacity: 0.6 },
-  b: { left: '0%', top: '0%', width: '100%', height: '100%', opacity: 0.6 },
-  m: { left: '0%', top: '0%', width: '100%', height: '100%', opacity: 0.6 },
-  '.': { left: '0%', top: '0%', width: '100%', height: '100%', opacity: 0.6 }
+  z: { left: LEFT_SHIFT, top: '0%', width: '100%', height: '100%', opacity: 0.6 },
+  c: { left: LEFT_SHIFT, top: '0%', width: '100%', height: '100%', opacity: 0.6 },
+  b: { left: LEFT_SHIFT, top: '0%', width: '100%', height: '100%', opacity: 0.6 },
+  m: { left: LEFT_SHIFT, top: '0%', width: '100%', height: '100%', opacity: 0.6 },
+  '.': { left: LEFT_SHIFT, top: '0%', width: '100%', height: '100%', opacity: 0.6 }
 };
 
 const videos = {};
@@ -118,6 +121,7 @@ function checkVideosEnd() {
   if (allEnded) {
     for (const vid of Object.values(videos)) {
       vid.pause();
+      vid.currentTime = 0;
       vid.style.display = 'none';
     }
     keysDown.clear();
