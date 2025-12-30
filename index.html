@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>V.7.3 Vocalsynth</title>
+<title>V.7.4 Vocalsynth</title>
 <style>
   body {
     margin: 0;
@@ -31,11 +31,11 @@ const VIDEO_MAPPING = {
 
 // Start positions inside middle 1/3 horizontally
 const START_POS = {
-  z: { left: '35%', top: '10%', width: '10%', height: '30%' },
-  c: { left: '55%', top: '10%', width: '10%', height: '30%' },
-  b: { left: '35%', top: '55%', width: '10%', height: '30%' },
-  m: { left: '55%', top: '55%', width: '10%', height: '30%' },
-  '.': { left: '45%', top: '35%', width: '10%', height: '30%' }
+  z: { left: '33%', top: '10%', width: '10%', height: '30%' },
+  c: { left: '53%', top: '10%', width: '10%', height: '30%' },
+  b: { left: '33%', top: '55%', width: '10%', height: '30%' },
+  m: { left: '53%', top: '55%', width: '10%', height: '30%' },
+  '.': { left: '43%', top: '35%', width: '10%', height: '30%' }
 };
 
 // ME phase positions, full height, overlapping, slightly transparent, shifted left by 2%
@@ -71,6 +71,32 @@ function setVideoPos(video, pos) {
   if (pos.opacity !== undefined) video.style.opacity = pos.opacity;
 }
 
+// Reset all videos to initial state
+function resetVideos() {
+  for (const vid of Object.values(videos)) {
+    // Fade out
+    vid.style.transition = 'opacity 1s ease-in-out';
+    vid.style.opacity = 0;
+  }
+
+  // After fade-out, hide and reset everything
+  setTimeout(() => {
+    for (const [key, vid] of Object.entries(videos)) {
+      vid.pause();
+      vid.currentTime = 0;
+      vid.style.display = 'none';
+      vid.style.transition = 'all 1s ease-in-out'; // reset transition
+      setVideoPos(vid, START_POS[key]);
+    }
+    keysDown.clear();
+    meCommitted = false;
+    if (meDelayTimeout) {
+      clearTimeout(meDelayTimeout);
+      meDelayTimeout = null;
+    }
+  }, 1000); // matches fade duration
+}
+
 // Key handling
 document.addEventListener('keydown', e => {
   const key = e.key.toLowerCase();
@@ -80,6 +106,7 @@ document.addEventListener('keydown', e => {
   const vid = videos[key];
   setVideoPos(vid, START_POS[key]);
   vid.style.display = 'block';
+  vid.style.opacity = 1; // reset opacity in case it faded
   vid.currentTime = 0;
   vid.play();
 
@@ -108,27 +135,22 @@ document.addEventListener('keyup', e => {
   }
 });
 
-// Reset videos after all ended
+// Check if all videos finished playing to reset
 function checkVideosEnd() {
-  if (!meCommitted) return;
+  if (!meCommitted) {
+    requestAnimationFrame(checkVideosEnd);
+    return;
+  }
   let allEnded = true;
   for (const vid of Object.values(videos)) {
     if (!vid.ended) allEnded = false;
   }
   if (allEnded) {
-    for (const vid of Object.values(videos)) {
-      vid.pause();
-      vid.style.display = 'none';
-    }
-    keysDown.clear();
-    meCommitted = false;
-    clearTimeout(meDelayTimeout);
-    meDelayTimeout = null;
+    resetVideos();
   }
   requestAnimationFrame(checkVideosEnd);
 }
 requestAnimationFrame(checkVideosEnd);
-
 </script>
 </body>
 </html>
