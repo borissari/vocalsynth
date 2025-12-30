@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>V.7.4 Vocalsynth</title>
+<title>V.7.4.1 Vocalsynth</title>
 <style>
   body {
     margin: 0;
@@ -31,12 +31,15 @@ const VIDEO_MAPPING = {
 
 // Start positions inside middle 1/3 horizontally
 const START_POS = {
-  z: { left: '33%', top: '10%', width: '10%', height: '30%' },
-  c: { left: '53%', top: '10%', width: '10%', height: '30%' },
-  b: { left: '33%', top: '55%', width: '10%', height: '30%' },
-  m: { left: '53%', top: '55%', width: '10%', height: '30%' },
-  '.': { left: '43%', top: '35%', width: '10%', height: '30%' }
+
+  z: { left: '33%', top: '10%', width: '12%', height: '35%' },
+  c: { left: '53%', top: '10%', width: '12%', height: '35%' },
+  b: { left: '33%', top: '55%', width: '12%', height: '35%' },
+  m: { left: '53%', top: '55%', width: '12%', height: '35%' },
+  '.': { left: '43%', top: '35%', width: '12%', height: '35%' }
 };
+
+  
 
 // ME phase positions, full height, overlapping, slightly transparent, shifted left by 2%
 const ME_POS = {
