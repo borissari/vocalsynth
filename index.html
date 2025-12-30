@@ -2,135 +2,130 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Vocalsynth Cropping Example</title>
+<title>Vocalsynth – Overlap Composite Face</title>
+
 <style>
-  body {
+  html, body {
     margin: 0;
-    overflow: hidden;
+    padding: 0;
     background: black;
+    overflow: hidden;
+    height: 100%;
   }
 
+  /* Stage = middle 1/3 of screen, full height */
   #stage {
     position: absolute;
-    left: 33.33vw; /* middle third of screen */
-    width: 33.33vw;
+    left: 33.333vw;
+    width: 33.333vw;
     height: 100vh;
+    background: black;
     overflow: hidden;
-    background: #111;
   }
 
   video {
     position: absolute;
-    object-fit: cover;
-    display: none;
-    transition: all 2s ease-in-out;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;   /* preserve ratio */
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  video.active {
+    opacity: 0.35;         /* low opacity = composite face */
+  }
+
+  #debug {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    color: white;
+    font-family: monospace;
+    font-size: 14px;
   }
 </style>
 </head>
+
 <body>
 
 <div id="stage"></div>
+<div id="debug">Keys held: 0 / 5</div>
 
 <script>
-const VIDEO_MAPPING = {
-  'z': 'vocalsynth_ethan.mp4',
-  'c': 'vocalsynth_bryan.mp4',
-  'b': 'vocalsynth_dad.mp4',
-  'm': 'vocalsynth_monsang.mp4',
-  '.': 'vocalsynth_mom.mp4'
+/* ---------------- CONFIG ---------------- */
+
+const VIDEOS = {
+  z: "vocalsynth_ethan.mp4",
+  c: "vocalsynth_bryan.mp4",
+  b: "vocalsynth_dad.mp4",
+  m: "vocalsynth_monsang.mp4",
+  ".": "vocalsynth_mom.mp4"
 };
 
-// YOU phase scattered positions & sizes
-const SCATTERED = {
-  z: {x:5, y:5, w:45, h:45, pos:'top'},      // top-left
-  c: {x:50, y:5, w:45, h:45, pos:'bottom'}, // top-right
-  b: {x:5, y:50, w:45, h:45, pos:'left'},   // bottom-left
-  m: {x:50, y:50, w:45, h:45, pos:'right'}, // bottom-right
-  '.': {x:25, y:25, w:45, h:45, pos:'center'} // middle
-};
+/* ---------------- SETUP ---------------- */
 
-// ME phase face positions, sizes, cropping (object-position)
-const FACE = {
-  z: {x:0, y:0, w:50, h:50, objPos:'50% 0%'},      // upper half
-  c: {x:0, y:50, w:50, h:50, objPos:'50% 100%'},   // lower half
-  b: {x:0, y:0, w:50, h:100, objPos:'0% 50%'},     // left half
-  m: {x:50, y:0, w:50, h:100, objPos:'100% 50%'},  // right half
-  '.': {x:25, y:25, w:50, h:50, objPos:'50% 50%'}  // center cropped
-};
+const stage = document.getElementById("stage");
+const debug = document.getElementById("debug");
 
-const stage = document.getElementById('stage');
-const videos = {};
-let keysDown = new Set();
-let meCommitted = false;
+const videoEls = {};
+const keysDown = new Set();
 
-// Create video elements
-for(const [key, src] of Object.entries(VIDEO_MAPPING)) {
-  const v = document.createElement('video');
-  v.src = src;
-  v.muted = true;
-  v.preload = 'auto';
+for (const key in VIDEOS) {
+  const v = document.createElement("video");
+  v.src = VIDEOS[key];
+  v.preload = "auto";
+  v.muted = false;
+  v.loop = false;
   v.playsInline = true;
   stage.appendChild(v);
-  videos[key] = v;
+  videoEls[key] = v;
 }
 
-// Set video positions & sizes
-function apply(video, pos) {
-  video.style.left = pos.x+'%';
-  video.style.top = pos.y+'%';
-  video.style.width = pos.w+'%';
-  video.style.height = pos.h+'%';
-  if(pos.objPos) video.style.objectPosition = pos.objPos;
-}
+/* ---------------- INPUT ---------------- */
 
-// Handle keydown
-document.addEventListener('keydown', e=>{
+document.addEventListener("keydown", e => {
   const key = e.key.toLowerCase();
-  if(!VIDEO_MAPPING[key] || keysDown.has(key)) return;
+  if (!(key in videoEls)) return;
+  if (keysDown.has(key)) return;
 
   keysDown.add(key);
-  const v = videos[key];
-  v.style.display = 'block';
-  apply(v, SCATTERED[key]);
-  
-  // Play video, wait for loadeddata
-  if(v.readyState >= 2) {
-    v.muted = false;
-    v.play().catch(console.warn);
-  } else {
-    v.addEventListener('loadeddata', ()=>{
-      v.muted = false;
-      v.play().catch(console.warn);
-    }, {once:true});
-  }
+  const v = videoEls[key];
 
-  if(keysDown.size === 5) {
-    meCommitted = true;
-    // Start ME phase after a short delay
-    setTimeout(()=>moveToFace(), 1000); // 1s delay
-  }
+  v.currentTime = 0;
+  v.classList.add("active");
+  v.style.opacity = "0.35";
+
+  v.play().catch(err => {
+    console.warn("Play blocked:", err);
+  });
+
+  updateDebug();
 });
 
-// Handle keyup
-document.addEventListener('keyup', e=>{
+document.addEventListener("keyup", e => {
   const key = e.key.toLowerCase();
-  if(!VIDEO_MAPPING[key]) return;
+  if (!(key in videoEls)) return;
+
   keysDown.delete(key);
 
-  // If ME not committed, hide video
-  if(!meCommitted) {
-    const v = videos[key];
+  /* If not all 5 committed, hide on release */
+  if (keysDown.size < 5) {
+    const v = videoEls[key];
     v.pause();
     v.currentTime = 0;
-    v.style.display = 'none';
+    v.classList.remove("active");
+    v.style.opacity = "0";
   }
+
+  updateDebug();
 });
 
-// Move videos to face (ME) positions with cropping
-function moveToFace() {
-  for(const [key, v] of Object.entries(videos)) {
-    apply(v, FACE[key]);
-  }
+/* ---------------- DEBUG ---------------- */
+
+function updateDebug() {
+  debug.textContent = `Keys held: ${keysDown.size} / 5`;
 }
 </script>
 
