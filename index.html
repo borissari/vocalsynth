@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vocalsynth v1</title>
+    <title>Vocalsynth v2</title>
     <style>
         * {
             margin: 0;
@@ -91,12 +91,13 @@
         };
         
         // Final positions for ME phase (as percentages of stage)
+        // Each quadrant is 50% x 50%, videos fill entire quadrants
         const FINAL_POSITIONS = {
-            'z': { x: 0, y: 0, width: 90, height: 90, clip: 'inset(0 50% 50% 0)' },        // top-left
-            'b': { x: 50, y: 0, width: 90, height: 90, clip: 'inset(0 0 50% 50%)' },       // top-right
-            'm': { x: 0, y: 50, width: 90, height: 90, clip: 'inset(50% 50% 0 0)' },       // bottom-left
-            '.': { x: 50, y: 50, width: 90, height: 90, clip: 'inset(50% 0 0 50%)' },      // bottom-right
-            'c': { x: 7.5, y: 7.5, width: 85, height: 85, clip: 'inset(15% 15% 15% 15%)' } // center
+            'z': { x: 0, y: 0, width: 50, height: 50, clip: 'none' },        // top-left
+            'b': { x: 50, y: 0, width: 50, height: 50, clip: 'none' },       // top-right
+            'm': { x: 0, y: 50, width: 50, height: 50, clip: 'none' },       // bottom-left
+            '.': { x: 50, y: 50, width: 50, height: 50, clip: 'none' },      // bottom-right
+            'c': { x: 25, y: 25, width: 50, height: 50, clip: 'none' }       // center overlapping
         };
         
         // ==================== STATE ====================
