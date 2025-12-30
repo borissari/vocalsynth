@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Vocalsynth</title>
+<title>Vocalsynth V7</title>
 <style>
   body {
     margin: 0;
@@ -107,15 +107,17 @@ document.addEventListener('keydown', e=>{
     document.getElementById('phase').textContent = 'WAITING 5s';
     state.pauseTimeout = setTimeout(()=>{
       state.meCommitted = true;
-      document.getElementById('phase').textContent = 'PAUSE → ME';
+      document.getElementById('phase').textContent = 'ME PHASE';
       
-      // move videos to center, full screen height, low opacity
+      // move videos to full viewport, low opacity, ignoring stage boundaries
       for(const [k,v] of Object.entries(state.videos)){
+        v.style.position = 'fixed';  // relative to viewport now
         v.style.left = '0';
         v.style.top = '0';
         v.style.height = window.innerHeight + 'px';
         v.style.width = 'auto';
         v.style.opacity = 0.3;
+        v.style.transition = 'all 2s ease';
       }
     }, 5000);
   }
@@ -157,6 +159,7 @@ function checkVideosEnd(){
         v.currentTime = 0;
         v.style.display = 'none';
         v.style.opacity = 1;
+        v.style.position = 'absolute';
         setVideoPos(k, SCATTERED[k]);
       }
       state.keysDown.clear();
