@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Vocalsynth V.3.4</title>
-
+<title>Vocalsynth V.3.5</title>
 <style>
   body {
     background: black;
@@ -26,6 +25,7 @@
     height: 40%;
     object-fit: cover;
     display: none;
+    will-change: transform;
   }
 
   .placeholder {
@@ -34,44 +34,48 @@
   }
 </style>
 </head>
-
 <body>
 
 <div id="stage">
-  <video id="z" src="vocalsynth_ethan.mp4" playsinline></video>
+  <video id="z" src="vocalsynth_ethan.mp4" playsinline muted loop></video>
   <div id="c" class="placeholder"></div>
-  <video id="b" src="vocalsynth_dad.mp4" playsinline></video>
-  <video id="m" src="vocalsynth_monsang.mp4" playsinline></video>
-  <video id="dot" src="vocalsynth_mom.mp4" playsinline></video>
+  <video id="b" src="vocalsynth_dad.mp4" playsinline muted loop></video>
+  <video id="m" src="vocalsynth_monsang.mp4" playsinline muted loop></video>
+  <video id="dot" src="vocalsynth_mom.mp4" playsinline muted loop></video>
 </div>
 
 <script>
 const items = {
   z: document.getElementById("z"),
-  c: document.getElementById("c"), // placeholder
+  c: document.getElementById("c"),
   b: document.getElementById("b"),
   m: document.getElementById("m"),
   ".": document.getElementById("dot")
 };
 
-const pressed = new Set();
+// YOU positions (percent)
+const startPos = { z:{x:55,y:5}, c:{x:45,y:5}, b:{x:55,y:55}, m:{x:5,y:55}, ".":{x:5,y:5} };
+// Face positions (ME)
+const facePos  = { z:{x:30,y:25}, c:{x:50,y:30}, b:{x:45,y:40}, m:{x:30,y:55}, ".":{x:45,y:55} };
+
+let pressed = new Set();
 let clock = 0;
 let meCommitted = false;
 let lastTime = performance.now();
 
-// YOU positions
-const startPos = { z:{x:55,y:5}, c:{x:45,y:5}, b:{x:55,y:55}, m:{x:5,y:55}, ".":{x:5,y:5} };
-// ME positions (face)
-const facePos  = { z:{x:30,y:25}, c:{x:50,y:30}, b:{x:45,y:40}, m:{x:30,y:55}, ".":{x:45,y:55} };
-
-function setPosition(el,pos){el.style.left=pos.x+"%";el.style.top=pos.y+"%";}
+document.addEventListener("click", ()=>{
+  // unmute all videos on first click
+  Object.values(items).forEach(v=>{if(v.tagName==="VIDEO") v.muted=false;});
+});
 
 document.addEventListener("keydown", e=>{
   const key = e.key.toLowerCase();
-  if(!items[key]||pressed.has(key)) return;
+  if(!items[key] || pressed.has(key)) return;
   pressed.add(key);
-  items[key].style.display="block";
-  setPosition(items[key], startPos[key]);
+  const el = items[key];
+  el.style.display = "block";
+  el.style.transform = `translate(${startPos[key].x}%,${startPos[key].y}%)`;
+  if(el.tagName==="VIDEO") el.currentTime=0, el.play();
   if(pressed.size===1 && !meCommitted) clock=0;
 });
 
@@ -79,13 +83,18 @@ document.addEventListener("keyup", e=>{
   const key = e.key.toLowerCase();
   if(!items[key]) return;
   pressed.delete(key);
-  if(!meCommitted) items[key].style.display="none";
+  if(!meCommitted) {
+    const el = items[key];
+    el.style.display = "none";
+    if(el.tagName==="VIDEO") el.pause();
+  }
 });
+
+function lerp(a,b,t){return a+(b-a)*t;}
 
 function update(now){
   const dt=(now-lastTime)/1000;
   lastTime=now;
-
   const activeCount=pressed.size;
 
   if(activeCount>0 || meCommitted) clock+=dt;
@@ -98,42 +107,34 @@ function update(now){
   // commit ME
   if(!meCommitted && activeCount===5) meCommitted=true;
 
-  // motion during PAUSE
+  // PAUSE phase motion (5-7s)
   if(clock>=5 && clock<7){
     const alpha=(clock-5)/2;
     Object.entries(items).forEach(([k,v])=>{
       if(v.style.display==="none") return;
-      const a=startPos[k], b=facePos[k];
-      setPosition(v,{x:a.x+(b.x-a.x)*alpha, y:a.y+(b.y-a.y)*alpha});
+      const sx=startPos[k].x, sy=startPos[k].y;
+      const ex=facePos[k].x, ey=facePos[k].y;
+      v.style.transform = `translate(${lerp(sx,ex,alpha)}%,${lerp(sy,ey,alpha)}%)`;
     });
   }
 
-  // lock ME
+  // ME lock (7-12s)
   if(clock>=7){
     Object.entries(items).forEach(([k,v])=>{
       if(v.style.display==="none") return;
-      setPosition(v, facePos[k]);
+      const p = facePos[k];
+      v.style.transform = `translate(${p.x}%,${p.y}%)`;
     });
   }
 
-  // update video time to match clock
-  Object.entries(items).forEach(([k,v])=>{
-    if(v.tagName==="VIDEO" && v.style.display!=="none"){
-      if(!meCommitted && activeCount<5){
-        // loop YOU 1-5
-        v.currentTime=Math.min(Math.max(clock,1),5);
-      } else {
-        // PAUSE+ME
-        v.currentTime=Math.min(clock,12);
-      }
-    }
-  });
-
-  // END RESET
+  // RESET
   if(meCommitted && clock>=12){
-    clock=0; meCommitted=false; pressed.clear();
+    clock=0;
+    meCommitted=false;
+    pressed.clear();
     Object.values(items).forEach(v=>{
       v.style.display="none";
+      if(v.tagName==="VIDEO") v.pause();
     });
   }
 
@@ -142,6 +143,5 @@ function update(now){
 
 requestAnimationFrame(update);
 </script>
-
 </body>
 </html>
