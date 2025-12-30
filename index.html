@@ -2,129 +2,193 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Audiosynth V.2.4</title>
+<title>Vocalsynth V.3.1</title>
 
 <style>
   body {
-    background: black;
     margin: 0;
+    background: black;
     overflow: hidden;
   }
 
-  .vid {
-    display: none;
+  /* ===== SCREEN AREA ===== */
+  #screen {
     position: absolute;
-    width: 50vw;
-    height: 50vh;
+    left: 33.33vw;              /* middle 1/3 horizontally */
+    width: 33.33vw;
+    top: 2cm;
+    bottom: 2cm;
+    overflow: hidden;
+  }
+
+  /* ===== VIDEO BASE ===== */
+  .vid {
+    position: absolute;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-    transition: all 0.2s ease;
+    display: none;
+    transition:
+      top 2s ease,
+      left 2s ease,
+      width 2s ease,
+      height 2s ease,
+      object-position 2s ease;
   }
 
-  /* original positions (used in multi mode) */
-  #v_z { top: 30px; left: 5vw;  object-position: 0% 0%; }
-  #v_c { top: 20px; left: 20vw; object-position: 50% 0%; }
-  #v_b { top: 10px; left: 35vw; object-position: 100% 0%; }
-  #v_m { top: 40px; left: 50vw; object-position: 0% 100%; }
-  #v_dot { top: 25px; left: 65vw; object-position: 50% 100%; }
-
-  /* FULL FRAME when solo */
-  .full {
-    width: 80vw !important;
-    height: 80vh !important;
-    top: 10vh !important;
-    left: 10vw !important;
-    object-position: 50% 50% !important;
-    z-index: 1;
-  }
-
-  /* CROPPED MODE when multiple keys */
-  .multi {
-    z-index: 2;
-  }
+  /* ===== FACE FORMATION (during PAUSE) ===== */
+  .face-z   { top: 0%;   left: 25%; width: 50%; height: 40%; object-position: center top; }
+  .face-c   { top: 40%;  left: 0%;  width: 50%; height: 30%; object-position: left center; }
+  .face-b   { top: 40%;  left: 50%; width: 50%; height: 30%; object-position: right center; }
+  .face-m   { top: 70%;  left: 25%; width: 50%; height: 30%; object-position: center bottom; }
+  .face-dot { top: 25%;  left: 25%; width: 50%; height: 50%; object-position: center center; }
 </style>
 </head>
 
 <body>
 
-<h2 style="color:white; position:fixed; top:10px; left:10px;">
-CLICK once → then hold Z C B M .
-</h2>
+<div id="screen">
 
-<video id="v_z" class="vid" src="IMG_6797.mov" loop playsinline></video>
-<video id="v_c" class="vid" src="IMG_8721.mov" loop playsinline></video>
-<video id="v_b" class="vid" src="filtered-EF866004-E8A0-4EA5-AFE8-DC5900FE4DEF 2.mov" loop playsinline></video>
-<video id="v_m" class="vid" src="IMG_6797.mov" loop playsinline></video>
-<video id="v_dot" class="vid" src="IMG_8721.mov" loop playsinline></video>
+  <video id="v_z"   class="vid" src="vocalsynth_ethan.mp4"   playsinline></video>
+  <!-- c intentionally skipped -->
+  <video id="v_b"   class="vid" src="vocalsynth_dad.mp4"     playsinline></video>
+  <video id="v_m"   class="vid" src="vocalsynth_monsang.mp4" playsinline></video>
+  <video id="v_dot" class="vid" src="vocalsynth_mom.mp4"     playsinline></video>
+
+</div>
 
 <script>
-let unlocked = false;
-const activeKeys = new Set();
+/* ===== TIMING (seconds) ===== */
+const YOU_END   = 5;
+const PAUSE_END = 7;
+const ME_END    = 12;
 
+/* ===== VIDEO MAP ===== */
 const videos = {
-  "z": document.getElementById("v_z"),
-  "c": document.getElementById("v_c"),
-  "b": document.getElementById("v_b"),
-  "m": document.getElementById("v_m"),
+  z:   document.getElementById("v_z"),
+  b:   document.getElementById("v_b"),
+  m:   document.getElementById("v_m"),
   ".": document.getElementById("v_dot")
+  // c intentionally omitted
 };
 
-// 🔓 Unlock audio/video on click
-document.addEventListener("click", () => {
-  unlocked = true;
-  console.log("Audio unlocked");
+const faceClasses = {
+  z:   "face-z",
+  c:   "face-c",
+  b:   "face-b",
+  m:   "face-m",
+  ".": "face-dot"
+};
+
+const activeKeys = new Set();
+let meCommitted = false;
+let faceScheduled = false;
+let unlock = false;
+
+/* ===== UNLOCK AUTOPLAY ===== */
+document.addEventListener("click", () => unlock = true);
+
+/* ===== KEYDOWN ===== */
+document.addEventListener("keydown", e => {
+  if (!unlock || meCommitted) return;
+
+  const k = e.key.toLowerCase();
+  const v = videos[k];
+  if (!v || activeKeys.has(k)) return;
+
+  activeKeys.add(k);
+
+  v.style.display = "block";
+  v.muted = false;
+  v.volume = 1;
+
+  if (v.paused) v.play();
+
+  checkAllPressed();
 });
 
-function updateLayout() {
-  const count = activeKeys.size;
+/* ===== KEYUP ===== */
+document.addEventListener("keyup", e => {
+  if (meCommitted) return;
 
-  Object.entries(videos).forEach(([key, v]) => {
-    if (!activeKeys.has(key)) {
-      v.pause();
-      v.style.display = "none";
-      v.classList.remove("full", "multi");
-      return;
-    }
+  const k = e.key.toLowerCase();
+  const v = videos[k];
+  if (!v) return;
 
-    v.style.display = "block";
+  activeKeys.delete(k);
+  v.pause();
+  v.currentTime = 0;
+  v.style.display = "none";
+});
 
-    if (count === 1) {
-      // SOLO → full frame
-      v.classList.add("full");
-      v.classList.remove("multi");
-    } else {
-      // MULTI → cropped
-      v.classList.remove("full");
-      v.classList.add("multi");
-    }
+/* ===== LOOP CONTROL ===== */
+setInterval(() => {
+  if (meCommitted) return;
+
+  Object.values(videos).forEach(v => {
+    if (v.paused || v.currentTime < YOU_END) return;
+    if (activeKeys.size < 4) v.currentTime = 0; // YOU loop
+  });
+}, 50);
+
+/* ===== ALL PRESSED LOGIC ===== */
+function checkAllPressed() {
+  if (activeKeys.size === 4 && !faceScheduled) {
+    faceScheduled = true;
+    syncAndScheduleFace();
+  }
+}
+
+function syncAndScheduleFace() {
+  const master = videos.z.currentTime;
+
+  Object.values(videos).forEach(v => v.currentTime = master);
+
+  const delay =
+    master < YOU_END
+      ? YOU_END - master
+      : ME_END - master + YOU_END;
+
+  setTimeout(() => {
+    moveToFace();
+    setTimeout(startMePhase, (PAUSE_END - YOU_END) * 1000);
+  }, delay * 1000);
+}
+
+/* ===== FACE MOVE ===== */
+function moveToFace() {
+  Object.entries(videos).forEach(([k, v]) => {
+    v.classList.add(faceClasses[k]);
   });
 }
 
-document.addEventListener("keydown", (e) => {
-  if (!unlocked) return;
+/* ===== ME PHASE ===== */
+function startMePhase() {
+  meCommitted = true;
+  Object.values(videos).forEach(v => v.play());
 
-  const key = e.key.toLowerCase();
-  const v = videos[key];
-  if (!v || activeKeys.has(key)) return;
+  const checkEnd = setInterval(() => {
+    if (videos.z.currentTime >= ME_END) {
+      clearInterval(checkEnd);
+      resetAll();
+    }
+  }, 100);
+}
 
-  activeKeys.add(key);
+/* ===== RESET ===== */
+function resetAll() {
+  meCommitted = false;
+  faceScheduled = false;
+  activeKeys.clear();
 
-  v.muted = false;
-  v.volume = 1.0;
-  v.currentTime = 0;
-  v.play().catch(err => console.warn(err));
-
-  updateLayout();
-});
-
-document.addEventListener("keyup", (e) => {
-  const key = e.key.toLowerCase();
-  if (!videos[key]) return;
-
-  activeKeys.delete(key);
-  updateLayout();
-});
+  Object.entries(videos).forEach(([k, v]) => {
+    v.pause();
+    v.currentTime = 0;
+    v.style.display = "none";
+    v.classList.remove(faceClasses[k]);
+  });
+}
 </script>
 
 </body>
 </html>
-
