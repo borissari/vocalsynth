@@ -1,212 +1,183 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>vocalsynth V.3.2</title>
+<title>vocalsynthV.3.3</title>
 
 <style>
-body {
-  margin: 0;
-  background: black;
-  overflow: hidden;
-  font-family: monospace;
-}
+  body {
+    background: black;
+    margin: 0;
+    overflow: hidden;
+  }
 
-/* ===== SCREEN ===== */
-#screen {
-  position: absolute;
-  left: 33.33vw;
-  width: 33.33vw;
-  top: 2cm;
-  bottom: 2cm;
-}
+  #stage {
+    position: absolute;
+    top: 2cm;
+    bottom: 2cm;
+    left: 33vw;
+    width: 34vw;
+    overflow: hidden;
+  }
 
-/* ===== PLAYER WRAPPER ===== */
-.player {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  display: none;
-  overflow: hidden;
-  transition: all 2s ease;
-}
-
-/* ===== VIDEO ===== */
-.player video {
-  width: 130%;
-  height: 130%;
-  object-fit: cover;
-  transition: transform 2s ease;
-}
-
-/* ===== SQUARE (C) ===== */
-.square {
-  width: 100%;
-  height: 100%;
-  background: #aaa;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-}
-
-/* ===== FACE POSITIONS ===== */
-.face-z   { top: 0%;   left: 25%; width: 50%; height: 35%; }
-.face-c   { top: 35%;  left: 0%;  width: 50%; height: 30%; }
-.face-b   { top: 35%;  left: 50%; width: 50%; height: 30%; }
-.face-m   { top: 65%;  left: 25%; width: 50%; height: 35%; }
-.face-dot { top: 25%;  left: 25%; width: 50%; height: 50%; }
-
-/* ===== CROPS ===== */
-.crop-z   video { transform: translateY(-10%); }
-.crop-b   video { transform: translateX(-15%); }
-.crop-m   video { transform: translateY(-25%); }
-.crop-dot video { transform: scale(1.1); }
-
+  video {
+    position: absolute;
+    width: 40%;
+    height: 40%;
+    object-fit: cover;
+    display: none;
+    transition: none;
+  }
 </style>
 </head>
 
 <body>
 
-<div id="screen">
+<div id="stage">
+  <video id="z" src="vocalsynth_ethan.mp4" playsinline></video>
+  <video id="b" src="vocalsynth_dad.mp4" playsinline></video>
+  <video id="m" src="vocalsynth_monsang.mp4" playsinline></video>
+  <video id="dot" src="vocalsynth_mom.mp4" playsinline></video>
 
-  <div id="p_z" class="player">
-    <video src="vocalsynth_ethan.mp4"></video>
-  </div>
-
-  <div id="p_c" class="player">
-    <div class="square" id="square_c"></div>
-  </div>
-
-  <div id="p_b" class="player">
-    <video src="vocalsynth_dad.mp4"></video>
-  </div>
-
-  <div id="p_m" class="player">
-    <video src="vocalsynth_monsang.mp4"></video>
-  </div>
-
-  <div id="p_dot" class="player">
-    <video src="vocalsynth_mom.mp4"></video>
-  </div>
-
+  <!-- placeholder for C -->
+  <div id="c" style="display:none"></div>
 </div>
 
 <script>
-/* ===== TIME ===== */
-const YOU_START = 1;
-const YOU_END = 5;
-const PAUSE_END = 7;
-const ME_END = 12;
+/* ---------------- SETUP ---------------- */
 
-/* ===== PLAYERS ===== */
-const players = {
-  z:   { el: p_z,   video: p_z.querySelector("video"), time: 1 },
-  c:   { el: p_c,   video: null, time: 1 },
-  b:   { el: p_b,   video: p_b.querySelector("video"), time: 1 },
-  m:   { el: p_m,   video: p_m.querySelector("video"), time: 1 },
-  ".": { el: p_dot, video: p_dot.querySelector("video"), time: 1 }
+const videos = {
+  z: document.getElementById("z"),
+  b: document.getElementById("b"),
+  m: document.getElementById("m"),
+  ".": document.getElementById("dot")
 };
 
-const active = new Set();
-let faceMode = false;
-let meCommitted = false;
+// YOU positions
+const startPos = {
+  z: { x: 55, y: 5 },
+  b: { x: 55, y: 55 },
+  m: { x: 5,  y: 55 },
+  ".": { x: 5,  y: 5 }
+};
 
-/* ===== CLOCK ===== */
-setInterval(() => {
-  Object.entries(players).forEach(([k, p]) => {
-    if (!active.has(k) && !meCommitted) return;
+// ME face positions
+const facePos = {
+  z: { x: 30, y: 25 }, // eye
+  b: { x: 45, y: 40 }, // nose
+  m: { x: 30, y: 55 }, // mouth
+  ".": { x: 45, y: 55 }
+};
 
-    p.time += 0.016;
-
-    if (!meCommitted && active.size < 5 && p.time > YOU_END) {
-      p.time = YOU_START;
-      if (p.video) p.video.currentTime = YOU_START;
-    }
-
-    if (meCommitted && p.time > ME_END) resetAll();
-
-    if (k === "c") {
-      square_c.innerHTML = `
-        <div>${phase(p.time)}</div>
-        <div>${p.time.toFixed(2)}s</div>
-      `;
-    }
-  });
-}, 16);
-
-function phase(t) {
-  if (t < YOU_END) return "YOU";
-  if (t < PAUSE_END) return "PAUSE";
-  return "ME";
+function setPosition(v, pos) {
+  v.style.left = pos.x + "%";
+  v.style.top  = pos.y + "%";
 }
 
-/* ===== INPUT ===== */
+/* ---------------- TIMING ---------------- */
+
+const pressed = new Set();
+let clock = 0;
+let meCommitted = false;
+let lastTime = performance.now();
+
+/* ---------------- INPUT ---------------- */
+
+document.addEventListener("click", () => {
+  Object.values(videos).forEach(v => v.muted = false);
+});
+
 document.addEventListener("keydown", e => {
-  const k = e.key.toLowerCase();
-  if (!(k in players) || active.has(k)) return;
+  const key = e.key.toLowerCase();
+  const v = videos[key];
+  if (!v || pressed.has(key)) return;
 
-  active.add(k);
-  const p = players[k];
-  p.el.style.display = "block";
+  pressed.add(key);
+  v.style.display = "block";
+  v.currentTime = 0;
+  setPosition(v, startPos[key]);
+  v.play();
 
-  if (p.video) {
-    p.video.currentTime = p.time;
-    p.video.play();
-  }
-
-  if (active.size === 5) triggerFaceMode();
+  if (pressed.size === 1 && !meCommitted) clock = 0;
 });
 
 document.addEventListener("keyup", e => {
-  if (meCommitted) return;
-  const k = e.key.toLowerCase();
-  if (!(k in players)) return;
+  const key = e.key.toLowerCase();
+  const v = videos[key];
+  if (!v) return;
 
-  active.delete(k);
-  players[k].el.style.display = "none";
+  pressed.delete(key);
+
+  if (!meCommitted) {
+    v.pause();
+    v.style.display = "none";
+  }
 });
 
-/* ===== FACE MODE ===== */
-function triggerFaceMode() {
-  faceMode = true;
+/* ---------------- LOOP ---------------- */
 
-  const master = players.z.time;
-  Object.values(players).forEach(p => {
-    p.time = master;
-    if (p.video) p.video.currentTime = master;
-  });
+function update(now) {
+  const dt = (now - lastTime) / 1000;
+  lastTime = now;
 
-  setTimeout(() => {
-    Object.entries(players).forEach(([k, p]) => {
-      p.el.classList.add(`face-${k === "." ? "dot" : k}`);
-      p.el.classList.add(`crop-${k === "." ? "dot" : k}`);
+  const activeCount = pressed.size;
+
+  if (activeCount > 0 || meCommitted) {
+    clock += dt;
+  }
+
+  // YOU loop (1–5)
+  if (!meCommitted && activeCount < 4) {
+    Object.values(videos).forEach(v => {
+      if (v.style.display !== "none" && v.currentTime >= 5) {
+        v.currentTime = 1;
+      }
     });
-  }, (YOU_END - master) * 1000);
+  }
 
-  setTimeout(() => {
+  // commit ME
+  if (!meCommitted && activeCount === 4) {
     meCommitted = true;
-  }, (PAUSE_END - master) * 1000);
+  }
+
+  // PAUSE motion
+  if (clock >= 5 && clock < 7) {
+    const alpha = (clock - 5) / 2;
+    Object.entries(videos).forEach(([k, v]) => {
+      if (v.style.display === "none") return;
+      const a = startPos[k];
+      const b = facePos[k];
+      setPosition(v, {
+        x: a.x + (b.x - a.x) * alpha,
+        y: a.y + (b.y - a.y) * alpha
+      });
+    });
+  }
+
+  // lock ME
+  if (clock >= 7) {
+    Object.entries(videos).forEach(([k, v]) => {
+      if (v.style.display === "none") return;
+      setPosition(v, facePos[k]);
+    });
+  }
+
+  // END → RESET
+  if (meCommitted && clock >= 12) {
+    clock = 0;
+    meCommitted = false;
+    pressed.clear();
+    Object.values(videos).forEach(v => {
+      v.pause();
+      v.style.display = "none";
+    });
+  }
+
+  requestAnimationFrame(update);
 }
 
-/* ===== RESET ===== */
-function resetAll() {
-  meCommitted = false;
-  faceMode = false;
-  active.clear();
-
-  Object.values(players).forEach(p => {
-    p.time = YOU_START;
-    p.el.style.display = "none";
-    p.el.className = "player";
-    if (p.video) {
-      p.video.pause();
-      p.video.currentTime = YOU_START;
-    }
-  });
-}
+requestAnimationFrame(update);
 </script>
 
 </body>
 </html>
-
