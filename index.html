@@ -2,31 +2,28 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Vocalsynth Cropped ME</title>
+<title>Vocalsynth Cropping Example</title>
 <style>
   body {
     margin: 0;
     overflow: hidden;
     background: black;
-    font-family: monospace;
   }
+
   #stage {
     position: absolute;
-    top: 0;
-    left: 33.333vw; /* middle 1/3 of screen */
-    width: 33.333vw;
+    left: 33.33vw; /* middle third of screen */
+    width: 33.33vw;
     height: 100vh;
     overflow: hidden;
     background: #111;
   }
+
   video {
     position: absolute;
     object-fit: cover;
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-  video.active {
-    opacity: 1;
+    display: none;
+    transition: all 2s ease-in-out;
   }
 </style>
 </head>
@@ -43,134 +40,99 @@ const VIDEO_MAPPING = {
   '.': 'vocalsynth_mom.mp4'
 };
 
-// YOU phase positions
-const SCATTERED_POS = {
-  'z': { x: 0, y: 0, width: 50, height: 50 },
-  'c': { x: 50, y: 0, width: 50, height: 50 },
-  'b': { x: 0, y: 50, width: 50, height: 50 },
-  'm': { x: 50, y: 50, width: 50, height: 50 },
-  '.': { x: 25, y: 25, width: 50, height: 50 }
+// YOU phase scattered positions & sizes
+const SCATTERED = {
+  z: {x:5, y:5, w:45, h:45, pos:'top'},      // top-left
+  c: {x:50, y:5, w:45, h:45, pos:'bottom'}, // top-right
+  b: {x:5, y:50, w:45, h:45, pos:'left'},   // bottom-left
+  m: {x:50, y:50, w:45, h:45, pos:'right'}, // bottom-right
+  '.': {x:25, y:25, w:45, h:45, pos:'center'} // middle
 };
 
-// ME phase cropped positions
-const FACE_POS = {
-  'z': { x: 0, y: 0, width: 50, height: 50, clip: 'inset(0 0 50% 0)' },      // upper half
-  'c': { x: 0, y: 50, width: 50, height: 50, clip: 'inset(50% 0 0 0)' },     // lower half
-  'b': { x: 0, y: 0, width: 50, height: 50, clip: 'inset(0 50% 0 0)' },      // left half
-  'm': { x: 50, y: 0, width: 50, height: 50, clip: 'inset(0 0 0 50%)' },     // right half
-  '.': { x: 25, y: 25, width: 50, height: 50, clip: 'inset(25% 25% 25% 25%)' } // middle with 1/4 trimmed
+// ME phase face positions, sizes, cropping (object-position)
+const FACE = {
+  z: {x:0, y:0, w:50, h:50, objPos:'50% 0%'},      // upper half
+  c: {x:0, y:50, w:50, h:50, objPos:'50% 100%'},   // lower half
+  b: {x:0, y:0, w:50, h:100, objPos:'0% 50%'},     // left half
+  m: {x:50, y:0, w:50, h:100, objPos:'100% 50%'},  // right half
+  '.': {x:25, y:25, w:50, h:50, objPos:'50% 50%'}  // center cropped
 };
 
 const stage = document.getElementById('stage');
-const state = {
-  keysDown: new Set(),
-  videoElements: {},
-  meCommitted: false,
-  pausePhaseStarted: false,
-  mePhaseStarted: false,
-  pauseAnimStart: null
-};
+const videos = {};
+let keysDown = new Set();
+let meCommitted = false;
 
 // Create video elements
-for (const [key, src] of Object.entries(VIDEO_MAPPING)) {
-  const video = document.createElement('video');
-  video.src = src;
-  video.muted = true;
-  video.style.display = 'none';
-  video.preload = 'auto';
-  stage.appendChild(video);
-  state.videoElements[key] = video;
+for(const [key, src] of Object.entries(VIDEO_MAPPING)) {
+  const v = document.createElement('video');
+  v.src = src;
+  v.muted = true;
+  v.preload = 'auto';
+  v.playsInline = true;
+  stage.appendChild(v);
+  videos[key] = v;
 }
 
-// Apply position
-function applyPosition(key, pos) {
-  const video = state.videoElements[key];
-  video.style.left = pos.x + '%';
-  video.style.top = pos.y + '%';
-  video.style.width = pos.width + '%';
-  video.style.height = pos.height + '%';
-  if (pos.clip) video.style.clipPath = pos.clip;
-  else video.style.clipPath = 'none';
+// Set video positions & sizes
+function apply(video, pos) {
+  video.style.left = pos.x+'%';
+  video.style.top = pos.y+'%';
+  video.style.width = pos.w+'%';
+  video.style.height = pos.h+'%';
+  if(pos.objPos) video.style.objectPosition = pos.objPos;
 }
 
-// Linear interpolation
-function lerp(start, end, t) {
-  return start + (end - start) * t;
-}
-
-// Ease in-out
-function ease(t) {
-  return t<0.5 ? 2*t*t : -1+(4-2*t)*t;
-}
-
-// Animation loop
-function update() {
-  // If ME committed and PAUSE not started
-  if (state.meCommitted && !state.pausePhaseStarted) {
-    state.pausePhaseStarted = true;
-    state.pauseAnimStart = performance.now();
-    for (const key of Object.keys(VIDEO_MAPPING)) {
-      const v = state.videoElements[key];
-      if (v.paused) {
-        v.muted = false;
-        v.play().catch(console.warn);
-        v.currentTime = 5; // start of PAUSE
-      } else {
-        v.currentTime = 5;
-      }
-      v.style.display = 'block';
-    }
-  }
-
-  // Animate from scattered to face during PAUSE
-  if (state.pausePhaseStarted && !state.mePhaseStarted) {
-    const elapsed = (performance.now() - state.pauseAnimStart)/1000;
-    const alpha = ease(Math.min(elapsed/2,1)); // 2s animation
-    for (const key of Object.keys(VIDEO_MAPPING)) {
-      const start = SCATTERED_POS[key];
-      const end = FACE_POS[key];
-      const pos = {
-        x: lerp(start.x,end.x,alpha),
-        y: lerp(start.y,end.y,alpha),
-        width: lerp(start.width,end.width,alpha),
-        height: lerp(start.height,end.height,alpha),
-        clip: end.clip
-      };
-      applyPosition(key,pos);
-    }
-    if (elapsed>=2) state.mePhaseStarted = true;
-  }
-
-  requestAnimationFrame(update);
-}
-
-// Key handling
-document.addEventListener('keydown',e=>{
+// Handle keydown
+document.addEventListener('keydown', e=>{
   const key = e.key.toLowerCase();
-  if (!VIDEO_MAPPING[key] || state.keysDown.has(key)) return;
-  state.keysDown.add(key);
-  const v = state.videoElements[key];
+  if(!VIDEO_MAPPING[key] || keysDown.has(key)) return;
+
+  keysDown.add(key);
+  const v = videos[key];
   v.style.display = 'block';
-  applyPosition(key, SCATTERED_POS[key]);
-  v.muted=false;
-  v.play().catch(console.warn);
+  apply(v, SCATTERED[key]);
+  
+  // Play video, wait for loadeddata
+  if(v.readyState >= 2) {
+    v.muted = false;
+    v.play().catch(console.warn);
+  } else {
+    v.addEventListener('loadeddata', ()=>{
+      v.muted = false;
+      v.play().catch(console.warn);
+    }, {once:true});
+  }
 
-  if (state.keysDown.size===5) state.meCommitted=true;
-});
-
-document.addEventListener('keyup',e=>{
-  const key = e.key.toLowerCase();
-  if (!VIDEO_MAPPING[key]) return;
-  state.keysDown.delete(key);
-  if (!state.meCommitted) {
-    const v = state.videoElements[key];
-    v.pause();
-    v.currentTime=0;
-    v.style.display='none';
+  if(keysDown.size === 5) {
+    meCommitted = true;
+    // Start ME phase after a short delay
+    setTimeout(()=>moveToFace(), 1000); // 1s delay
   }
 });
 
-requestAnimationFrame(update);
+// Handle keyup
+document.addEventListener('keyup', e=>{
+  const key = e.key.toLowerCase();
+  if(!VIDEO_MAPPING[key]) return;
+  keysDown.delete(key);
+
+  // If ME not committed, hide video
+  if(!meCommitted) {
+    const v = videos[key];
+    v.pause();
+    v.currentTime = 0;
+    v.style.display = 'none';
+  }
+});
+
+// Move videos to face (ME) positions with cropping
+function moveToFace() {
+  for(const [key, v] of Object.entries(videos)) {
+    apply(v, FACE[key]);
+  }
+}
 </script>
+
 </body>
 </html>
