@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Vocalsynth ME Phase Demo</title>
+<title>aVocalsynth ME Phase Demo</title>
 <style>
   body {
     margin: 0;
@@ -62,7 +62,8 @@ const SCATTERED = {
 const state = {
   keysDown: new Set(),
   videos: {},
-  meCommitted: false
+  meCommitted: false,
+  pauseTimeout: null
 };
 
 const stage = document.getElementById('stage');
@@ -101,19 +102,22 @@ document.addEventListener('keydown', e=>{
   vid.currentTime = 0;
   vid.play();
 
-  // all 5 pressed → commit ME
+  // all 5 pressed → delay 5s before committing ME
   if(state.keysDown.size === 5 && !state.meCommitted){
-    state.meCommitted = true;
-    document.getElementById('phase').textContent = 'PAUSE → ME';
-    
-    // move videos to center, full screen height, low opacity
-    for(const [k,v] of Object.entries(state.videos)){
-      v.style.left = '0';
-      v.style.top = '0';
-      v.style.height = window.innerHeight + 'px';
-      v.style.width = 'auto';
-      v.style.opacity = 0.3;
-    }
+    document.getElementById('phase').textContent = 'WAITING 5s';
+    state.pauseTimeout = setTimeout(()=>{
+      state.meCommitted = true;
+      document.getElementById('phase').textContent = 'PAUSE → ME';
+      
+      // move videos to center, full screen height, low opacity
+      for(const [k,v] of Object.entries(state.videos)){
+        v.style.left = '0';
+        v.style.top = '0';
+        v.style.height = window.innerHeight + 'px';
+        v.style.width = 'auto';
+        v.style.opacity = 0.3;
+      }
+    }, 5000);
   }
 });
 
@@ -124,7 +128,13 @@ document.addEventListener('keyup', e=>{
   state.keysDown.delete(key);
   document.getElementById('keys').textContent = state.keysDown.size;
 
-  // if ME committed, videos continue
+  // cancel ME commit if any key released before pause
+  if(!state.meCommitted && state.pauseTimeout){
+    clearTimeout(state.pauseTimeout);
+    state.pauseTimeout = null;
+    document.getElementById('phase').textContent = 'YOU';
+  }
+
   if(!state.meCommitted){
     const vid = state.videos[key];
     vid.pause();
@@ -135,30 +145,29 @@ document.addEventListener('keyup', e=>{
 
 // monitor when all videos end
 function checkVideosEnd(){
-  if(!state.meCommitted) return;
-  let allEnded = true;
-  for(const v of Object.values(state.videos)){
-    if(!v.ended) { allEnded=false; break; }
-  }
-  if(allEnded){
-    // reset
-    for(const [k,v] of Object.entries(state.videos)){
-      v.pause();
-      v.currentTime = 0;
-      v.style.display = 'none';
-      v.style.opacity = 1;
-      setVideoPos(k, SCATTERED[k]);
+  if(state.meCommitted){
+    let allEnded = true;
+    for(const v of Object.values(state.videos)){
+      if(!v.ended) { allEnded=false; break; }
     }
-    state.keysDown.clear();
-    state.meCommitted = false;
-    document.getElementById('phase').textContent = 'YOU';
-    document.getElementById('keys').textContent = '0';
+    if(allEnded){
+      // reset
+      for(const [k,v] of Object.entries(state.videos)){
+        v.pause();
+        v.currentTime = 0;
+        v.style.display = 'none';
+        v.style.opacity = 1;
+        setVideoPos(k, SCATTERED[k]);
+      }
+      state.keysDown.clear();
+      state.meCommitted = false;
+      document.getElementById('phase').textContent = 'YOU';
+      document.getElementById('keys').textContent = '0';
+    }
   }
   requestAnimationFrame(checkVideosEnd);
 }
 checkVideosEnd();
-
 </script>
 </body>
 </html>
-
