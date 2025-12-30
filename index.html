@@ -2,115 +2,173 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Vocalsynth Combined</title>
+<title>Vocalsynth Cropped ME</title>
 <style>
-body {
-    margin:0;
-    background:black;
-    overflow:hidden;
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: black;
     font-family: monospace;
-}
-#stage {
-    position:absolute;
-    top:0;
-    left:33vw;
-    width:34vw;
-    height:100vh;
-    overflow:hidden;
-    background:#111;
-}
-
-/* Combined video */
-video {
-    position:absolute;
-    object-fit:cover;
-    transition: all 2s ease-in-out;
-}
+  }
+  #stage {
+    position: absolute;
+    top: 0;
+    left: 33.333vw; /* middle 1/3 of screen */
+    width: 33.333vw;
+    height: 100vh;
+    overflow: hidden;
+    background: #111;
+  }
+  video {
+    position: absolute;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  video.active {
+    opacity: 1;
+  }
 </style>
 </head>
 <body>
 
-<div id="stage">
-    <video id="video" src="vocalsynth_combined.mp4" muted></video>
-</div>
+<div id="stage"></div>
 
 <script>
-// ================= CONFIG =================
-const video = document.getElementById("video");
+const VIDEO_MAPPING = {
+  'z': 'vocalsynth_ethan.mp4',
+  'c': 'vocalsynth_bryan.mp4',
+  'b': 'vocalsynth_dad.mp4',
+  'm': 'vocalsynth_monsang.mp4',
+  '.': 'vocalsynth_mom.mp4'
+};
 
-// Initial scattered positions (YOU) - percentages relative to stage
-const startPositions = [
-    {x:10, y:10, width:45, height:45}, // Ethan (Z)
-    {x:55, y:10, width:45, height:45}, // Bryan (C)
-    {x:10, y:55, width:45, height:45}, // Dad (B)
-    {x:55, y:55, width:45, height:45}, // Monsang (M)
-    {x:32.5, y:32.5, width:35, height:35} // Mom (.)
-];
+// YOU phase positions
+const SCATTERED_POS = {
+  'z': { x: 0, y: 0, width: 50, height: 50 },
+  'c': { x: 50, y: 0, width: 50, height: 50 },
+  'b': { x: 0, y: 50, width: 50, height: 50 },
+  'm': { x: 50, y: 50, width: 50, height: 50 },
+  '.': { x: 25, y: 25, width: 50, height: 50 }
+};
 
-// Face positions (ME)
-const facePositions = [
-    {x:10, y:10, width:60, height:60},  // Ethan - left eye
-    {x:60, y:10, width:60, height:60},  // Bryan - right eye
-    {x:35, y:45, width:70, height:70},  // Dad - nose
-    {x:15, y:65, width:50, height:50},  // Monsang - mouth left
-    {x:55, y:65, width:50, height:50}   // Mom - mouth right
-];
+// ME phase cropped positions
+const FACE_POS = {
+  'z': { x: 0, y: 0, width: 50, height: 50, clip: 'inset(0 0 50% 0)' },      // upper half
+  'c': { x: 0, y: 50, width: 50, height: 50, clip: 'inset(50% 0 0 0)' },     // lower half
+  'b': { x: 0, y: 0, width: 50, height: 50, clip: 'inset(0 50% 0 0)' },      // left half
+  'm': { x: 50, y: 0, width: 50, height: 50, clip: 'inset(0 0 0 50%)' },     // right half
+  '.': { x: 25, y: 25, width: 50, height: 50, clip: 'inset(25% 25% 25% 25%)' } // middle with 1/4 trimmed
+};
 
-// ================= STATE =================
-let keysDown = new Set();
-let meCommitted = false;
-let pauseAnimStarted = false;
+const stage = document.getElementById('stage');
+const state = {
+  keysDown: new Set(),
+  videoElements: {},
+  meCommitted: false,
+  pausePhaseStarted: false,
+  mePhaseStarted: false,
+  pauseAnimStart: null
+};
 
-// ================= UTILS =================
-function applyPos(pos) {
-    video.style.left = pos.x + '%';
-    video.style.top = pos.y + '%';
-    video.style.width = pos.width + '%';
-    video.style.height = pos.height + '%';
+// Create video elements
+for (const [key, src] of Object.entries(VIDEO_MAPPING)) {
+  const video = document.createElement('video');
+  video.src = src;
+  video.muted = true;
+  video.style.display = 'none';
+  video.preload = 'auto';
+  stage.appendChild(video);
+  state.videoElements[key] = video;
 }
 
-// ================= INPUT =================
-document.addEventListener('keydown', (e)=>{
-    const key = e.key.toLowerCase();
-    if(!['z','c','b','m','.'].includes(key)) return;
-    keysDown.add(key);
+// Apply position
+function applyPosition(key, pos) {
+  const video = state.videoElements[key];
+  video.style.left = pos.x + '%';
+  video.style.top = pos.y + '%';
+  video.style.width = pos.width + '%';
+  video.style.height = pos.height + '%';
+  if (pos.clip) video.style.clipPath = pos.clip;
+  else video.style.clipPath = 'none';
+}
 
-    // Show video if first key
-    if(video.style.display !== 'block') {
-        video.style.display = 'block';
-        video.currentTime = 0;
-        video.muted = false;
-        video.play();
-    }
+// Linear interpolation
+function lerp(start, end, t) {
+  return start + (end - start) * t;
+}
 
-    // Commit ME if all keys pressed
-    if(keysDown.size === 5 && !meCommitted) {
-        meCommitted = true;
-    }
-});
+// Ease in-out
+function ease(t) {
+  return t<0.5 ? 2*t*t : -1+(4-2*t)*t;
+}
 
-document.addEventListener('keyup', (e)=>{
-    const key = e.key.toLowerCase();
-    if(!['z','c','b','m','.'].includes(key)) return;
-    keysDown.delete(key);
-});
-
-// ================= ANIMATION LOOP =================
+// Animation loop
 function update() {
-    if(!meCommitted) {
-        // YOU phase: scattered
-        applyPos({x:0,y:0,width:34,height:100}); // Video fills stage initially
-    } else if(meCommitted && !pauseAnimStarted) {
-        // Start PAUSE -> animate to face
-        pauseAnimStarted = true;
-        // animate using CSS transition
-        // each face part is represented as a crop in the combined video
-        // for simplicity, we just move the video to ME final position
-        // in real case, use multiple videos or canvas to crop
-        applyPos({x:0,y:0,width:100,height:100}); // fill stage
+  // If ME committed and PAUSE not started
+  if (state.meCommitted && !state.pausePhaseStarted) {
+    state.pausePhaseStarted = true;
+    state.pauseAnimStart = performance.now();
+    for (const key of Object.keys(VIDEO_MAPPING)) {
+      const v = state.videoElements[key];
+      if (v.paused) {
+        v.muted = false;
+        v.play().catch(console.warn);
+        v.currentTime = 5; // start of PAUSE
+      } else {
+        v.currentTime = 5;
+      }
+      v.style.display = 'block';
     }
-    requestAnimationFrame(update);
+  }
+
+  // Animate from scattered to face during PAUSE
+  if (state.pausePhaseStarted && !state.mePhaseStarted) {
+    const elapsed = (performance.now() - state.pauseAnimStart)/1000;
+    const alpha = ease(Math.min(elapsed/2,1)); // 2s animation
+    for (const key of Object.keys(VIDEO_MAPPING)) {
+      const start = SCATTERED_POS[key];
+      const end = FACE_POS[key];
+      const pos = {
+        x: lerp(start.x,end.x,alpha),
+        y: lerp(start.y,end.y,alpha),
+        width: lerp(start.width,end.width,alpha),
+        height: lerp(start.height,end.height,alpha),
+        clip: end.clip
+      };
+      applyPosition(key,pos);
+    }
+    if (elapsed>=2) state.mePhaseStarted = true;
+  }
+
+  requestAnimationFrame(update);
 }
+
+// Key handling
+document.addEventListener('keydown',e=>{
+  const key = e.key.toLowerCase();
+  if (!VIDEO_MAPPING[key] || state.keysDown.has(key)) return;
+  state.keysDown.add(key);
+  const v = state.videoElements[key];
+  v.style.display = 'block';
+  applyPosition(key, SCATTERED_POS[key]);
+  v.muted=false;
+  v.play().catch(console.warn);
+
+  if (state.keysDown.size===5) state.meCommitted=true;
+});
+
+document.addEventListener('keyup',e=>{
+  const key = e.key.toLowerCase();
+  if (!VIDEO_MAPPING[key]) return;
+  state.keysDown.delete(key);
+  if (!state.meCommitted) {
+    const v = state.videoElements[key];
+    v.pause();
+    v.currentTime=0;
+    v.style.display='none';
+  }
+});
 
 requestAnimationFrame(update);
 </script>
